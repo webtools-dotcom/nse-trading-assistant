@@ -65,51 +65,69 @@ The result: two independently validated trading strategies, wrapped in a multi-t
 ---
 
 ## 🏗️ Architecture
-User question
-│
-▼
-┌───────────────────────────────┐
-│    Agent (multi-step loop)    │  ←── system prompt routes short vs long-term
-└───────────────┬───────────────┘
-│ tool calls (up to 12 rounds)
-▼
-┌─────────────────────────────────────────────┐
-│  scan_watchlist_text_short / _long           │
-│  get_full_analysis (forces full checklist)   │
-│    ├─ market regime (long-term only)         │
-│    ├─ snapshot (RSI/momentum/ATR/stops)      │
-│    ├─ fundamentals (P/E, growth, ROE)        │
-│    ├─ institutional activity (delivery/bulk) │
-│    └─ upcoming results                       │
-│  calculate_position_size (risk-gated)        │
-└───────────────┬───────────────────────────────┘
-│ reads from
-▼
-┌─────────────────────────────────────────────┐
-│         Local cache (refreshed daily)        │
-│  price data · delivery history · bulk deals  │
-│  Nifty index · sector RS · market breadth    │
-│  results calendar                            │
-└───────────────────────────────────────────────┘
+
+```mermaid
+flowchart TD
+    A["👤 User Question"] --> B["🤖 Agent<br/>Multi-step tool-calling loop<br/>Routes to Short-term or Long-term strategy"]
+
+    subgraph TOOLS [" 🔧 Tool Layer "]
+        direction TB
+        C1["scan_watchlist_text_short<br/>RSI < 30 · backtested z = 8.08"]
+        C2["scan_watchlist_text_long<br/>Near 52w High + Uptrend · z = 9.69"]
+        D["get_full_analysis<br/>Forces the complete checklist every time"]
+        D --> E1["🌐 Market Regime<br/>long-term only"]
+        D --> E2["📊 Technical Snapshot<br/>RSI · Momentum · ATR · Stops"]
+        D --> E3["📈 Fundamentals<br/>P/E · Growth · ROE · Debt"]
+        D --> E4["🏛️ Institutional Activity<br/>Delivery % · Bulk Deals"]
+        D --> E5["📅 Upcoming Results"]
+        F["calculate_position_size<br/>🚫 Risk-gated — blocks >2% risk<br/>or parabolic setups"]
+    end
+
+    B --> C1
+    B --> C2
+    C1 --> D
+    C2 --> D
+    E1 --> F
+    E2 --> F
+    E3 --> F
+    E4 --> F
+    E5 --> F
+    F --> G["✅ Final Answer to User"]
+
+    subgraph CACHE [" 💾 Local Cache — refreshed daily via refresh_cache.py "]
+        direction LR
+        H1["Price Data"]
+        H2["Delivery History"]
+        H3["Bulk Deals"]
+        H4["Nifty Index"]
+        H5["Sector RS"]
+        H6["Market Breadth"]
+        H7["Results Calendar"]
+    end
+
+    TOOLS -.reads from.-> CACHE
+```
 
 ## 📁 Project structure
-├── config.py                       # watchlist, feature sets, model paths, LLM providers, risk defaults
-├── data_fetcher.py                  # short-term feature engineering (RSI, MACD, ATR)
-├── data_fetcher_long.py              # long-term feature engineering (SMA50/200, momentum, fundamentals)
-├── cache_manager.py                  # local cache: price, delivery, bulk deals, Nifty, sector RS, breadth, results
-├── model_trainer_short.py             # trains short-term XGBoost model
-├── model_trainer_long.py              # trains long-term XGBoost model
-├── refresh_cache.py                   # run daily - refreshes all cached data
-├── tools.py                           # 9 agent tools + risk-gating + deterministic labeling logic
-├── agent.py                           # LLM agent loop (multi-step tool calling)
-├── main.py                            # CLI chat interface
-├── app.py                             # Streamlit browser chat interface
-├── nse_watchlist_full.csv              # NSE Microcap 250 constituent list
+
+```
+trading-assistant/
+├── config.py                  # watchlist, feature sets, model paths, LLM providers, risk defaults
+├── data_fetcher.py             # short-term feature engineering (RSI, MACD, ATR)
+├── data_fetcher_long.py         # long-term feature engineering (SMA50/200, momentum, fundamentals)
+├── cache_manager.py             # local cache: price, delivery, bulk deals, Nifty, sector RS, breadth, results
+├── model_trainer_short.py        # trains short-term XGBoost model
+├── model_trainer_long.py         # trains long-term XGBoost model
+├── refresh_cache.py              # run daily — refreshes all cached data
+├── tools.py                      # 9 agent tools + risk-gating + deterministic labeling logic
+├── agent.py                      # LLM agent loop (multi-step tool calling)
+├── main.py                       # CLI chat interface
+├── app.py                        # Streamlit browser chat interface
+├── nse_watchlist_full.csv         # NSE Microcap 250 constituent list
 ├── requirements.txt
-└── trading_model_short.pkl / trading_model_long.pkl   # trained models (minor inputs only, see Limitations)
-
----
-
+├── trading_model_short.pkl        # trained short-term model (minor input only, see Limitations)
+└── trading_model_long.pkl         # trained long-term model (minor input only, see Limitations)
+```
 ## 🚀 Quick start
 
 ```bash
