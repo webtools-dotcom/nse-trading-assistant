@@ -1,0 +1,10 @@
+yfinance
+pandas
+numpy
+ta
+xgboost
+scikit-learn
+openai
+python-dotenv
+nselib
+streamlit
