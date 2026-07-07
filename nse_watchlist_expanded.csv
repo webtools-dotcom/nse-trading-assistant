@@ -1,0 +1,749 @@
+Company Name,Industry,Symbol,ticker,market_cap,cap_rank,cap_bucket
+Reliance Industries Ltd.,Oil Gas & Consumable Fuels,RELIANCE,RELIANCE.NS,17705887334400.0,1,Large
+HDFC Bank Ltd.,Financial Services,HDFCBANK,HDFCBANK.NS,12772231348224.0,2,Large
+Bharti Airtel Ltd.,Telecommunication,BHARTIARTL,BHARTIARTL.NS,12014407647232.0,3,Large
+ICICI Bank Ltd.,Financial Services,ICICIBANK,ICICIBANK.NS,10147134963712.0,4,Large
+State Bank of India,Financial Services,SBIN,SBIN.NS,9582303772672.0,5,Large
+Tata Consultancy Services Ltd.,Information Technology,TCS,TCS.NS,7583873630208.0,6,Large
+Bajaj Finance Ltd.,Financial Services,BAJFINANCE,BAJFINANCE.NS,6482136399872.0,7,Large
+Life Insurance Corporation of India,Financial Services,LICI,LICI.NS,5507807969280.0,8,Large
+Larsen & Toubro Ltd.,Construction,LT,LT.NS,5491773145088.0,9,Large
+Hindustan Unilever Ltd.,Fast Moving Consumer Goods,HINDUNILVR,HINDUNILVR.NS,5189777489920.0,10,Large
+Maruti Suzuki India Ltd.,Automobile and Auto Components,MARUTI,MARUTI.NS,4570784202752.0,11,Large
+Sun Pharmaceutical Industries Ltd.,Healthcare,SUNPHARMA,SUNPHARMA.NS,4566893985792.0,12,Large
+Infosys Ltd.,Information Technology,INFY,INFY.NS,4339641352192.0,13,Large
+Adani Enterprises Ltd.,Metals & Mining,ADANIENT,ADANIENT.NS,4263039729664.0,14,Large
+Adani Ports and Special Economic Zone Ltd.,Services,ADANIPORTS,ADANIPORTS.NS,4225230438400.0,15,Large
+Adani Power Ltd.,Power,ADANIPOWER,ADANIPOWER.NS,4205413662720.0,16,Large
+Axis Bank Ltd.,Financial Services,AXISBANK,AXISBANK.NS,4171553570816.0,17,Large
+Titan Company Ltd.,Consumer Durables,TITAN,TITAN.NS,4084133789696.0,18,Large
+Mahindra & Mahindra Ltd.,Automobile and Auto Components,M&M,M&M.NS,3838116364288.0,19,Large
+Kotak Mahindra Bank Ltd.,Financial Services,KOTAKBANK,KOTAKBANK.NS,3796566016000.0,20,Large
+ITC Ltd.,Fast Moving Consumer Goods,ITC,ITC.NS,3617883947008.0,21,Large
+NTPC Ltd.,Power,NTPC,NTPC.NS,3434559307776.0,22,Large
+UltraTech Cement Ltd.,Construction Materials,ULTRACEMCO,ULTRACEMCO.NS,3426782019584.0,23,Large
+HCL Technologies Ltd.,Information Technology,HCLTECH,HCLTECH.NS,3160876515328.0,24,Large
+Oil & Natural Gas Corporation Ltd.,Oil Gas & Consumable Fuels,ONGC,ONGC.NS,3071852412928.0,25,Large
+Bharat Electronics Ltd.,Capital Goods,BEL,BEL.NS,3063893721088.0,26,Large
+JSW Steel Ltd.,Metals & Mining,JSWSTEEL,JSWSTEEL.NS,3042246656000.0,27,Large
+Bajaj Finserv Ltd.,Financial Services,BAJAJFINSV,BAJAJFINSV.NS,3013667717120.0,28,Large
+Hindustan Aeronautics Ltd.,Capital Goods,HAL,HAL.NS,2942810456064.0,29,Large
+Nestle India Ltd.,Fast Moving Consumer Goods,NESTLEIND,NESTLEIND.NS,2838093103104.0,30,Large
+Bajaj Auto Ltd.,Automobile and Auto Components,BAJAJ-AUTO,BAJAJ-AUTO.NS,2823297695744.0,31,Large
+Eternal Ltd.,Consumer Services,ETERNAL,ETERNAL.NS,2660712316928.0,32,Large
+Avenue Supermarts Ltd.,Consumer Services,DMART,DMART.NS,2655228002304.0,33,Large
+Power Grid Corporation of India Ltd.,Power,POWERGRID,POWERGRID.NS,2644626898944.0,34,Large
+Coal India Ltd.,Oil Gas & Consumable Fuels,COALINDIA,COALINDIA.NS,2643502563328.0,35,Large
+Asian Paints Ltd.,Consumer Durables,ASIANPAINT,ASIANPAINT.NS,2618440810496.0,36,Large
+Shriram Finance Ltd.,Financial Services,SHRIRAMFIN,SHRIRAMFIN.NS,2510090141696.0,37,Large
+Adani Green Energy Ltd.,Power,ADANIGREEN,ADANIGREEN.NS,2502060670976.0,38,Large
+Tata Steel Ltd.,Metals & Mining,TATASTEEL,TATASTEEL.NS,2367031869440.0,39,Large
+Hindustan Zinc Ltd.,Metals & Mining,HINDZINC,HINDZINC.NS,2244066672640.0,40,Large
+Hindalco Industries Ltd.,Metals & Mining,HINDALCO,HINDALCO.NS,2167950409728.0,41,Large
+Grasim Industries Ltd.,Construction Materials,GRASIM,GRASIM.NS,2163981549568.0,42,Large
+InterGlobe Aviation Ltd.,Services,INDIGO,INDIGO.NS,2086017171456.0,43,Large
+Eicher Motors Ltd.,Automobile and Auto Components,EICHERMOT,EICHERMOT.NS,2068613431296.0,44,Large
+Indian Oil Corporation Ltd.,Oil Gas & Consumable Fuels,IOC,IOC.NS,2007757619200.0,45,Large
+Adani Energy Solutions Ltd.,Power,ADANIENSOL,ADANIENSOL.NS,1983317671936.0,46,Large
+SBI Life Insurance Company Ltd.,Financial Services,SBILIFE,SBILIFE.NS,1838237614080.0,47,Large
+Divi's Laboratories Ltd.,Healthcare,DIVISLAB,DIVISLAB.NS,1797620498432.0,48,Large
+TVS Motor Company Ltd.,Automobile and Auto Components,TVSMOTOR,TVSMOTOR.NS,1764372381696.0,49,Large
+Wipro Ltd.,Information Technology,WIPRO,WIPRO.NS,1711254536192.0,50,Large
+Solar Industries India Ltd.,Chemicals,SOLARINDS,SOLARINDS.NS,1653072330752.0,51,Large
+Pidilite Industries Ltd.,Chemicals,PIDILITIND,PIDILITIND.NS,1651137052672.0,52,Large
+Torrent Pharmaceuticals Ltd.,Healthcare,TORNTPHARM,TORNTPHARM.NS,1643728076800.0,53,Large
+Varun Beverages Ltd.,Fast Moving Consumer Goods,VBL,VBL.NS,1637958549504.0,54,Large
+DLF Ltd.,Realty,DLF,DLF.NS,1611675336704.0,55,Large
+Hyundai Motor India Ltd.,Automobile and Auto Components,HYUNDAI,HYUNDAI.NS,1609237659648.0,56,Large
+Jio Financial Services Ltd.,Financial Services,JIOFIN,JIOFIN.NS,1605025660928.0,57,Large
+ICICI Prudential Asset Management Company Ltd.,Financial Services,ICICIAMC,ICICIAMC.NS,1582566342656.0,58,Large
+Cholamandalam Investment and Finance Company Ltd.,Financial Services,CHOLAFIN,CHOLAFIN.NS,1580184109056.0,59,Large
+Tata Motors Ltd.,Capital Goods,TMCV,TMCV.NS,1565057744896.0,60,Large
+Trent Ltd.,Consumer Services,TRENT,TRENT.NS,1561197543424.0,61,Large
+Cummins India Ltd.,Capital Goods,CUMMINSIND,CUMMINSIND.NS,1516699779072.0,62,Large
+Samvardhana Motherson International Ltd.,Automobile and Auto Components,MOTHERSON,MOTHERSON.NS,1509862539264.0,63,Large
+Vodafone Idea Ltd.,Telecommunication,IDEA,IDEA.NS,1500551053312.0,64,Large
+BSE Ltd.,Financial Services,BSE,BSE.NS,1495935877120.0,65,Large
+Tata Capital Ltd.,Financial Services,TATACAP,TATACAP.NS,1486805925888.0,66,Large
+ABB India Ltd.,Capital Goods,ABB,ABB.NS,1478696632320.0,67,Large
+CG Power and Industrial Solutions Ltd.,Capital Goods,CGPOWER,CGPOWER.NS,1434018512896.0,68,Large
+Hitachi Energy India Ltd.,Capital Goods,POWERINDIA,POWERINDIA.NS,1422527037440.0,69,Large
+Polycab India Ltd.,Capital Goods,POLYCAB,POLYCAB.NS,1415587561472.0,70,Large
+Power Finance Corporation Ltd.,Financial Services,PFC,PFC.NS,1363437027328.0,71,Large
+Bharat Petroleum Corporation Ltd.,Oil Gas & Consumable Fuels,BPCL,BPCL.NS,1341378134016.0,72,Large
+Britannia Industries Ltd.,Fast Moving Consumer Goods,BRITANNIA,BRITANNIA.NS,1312009617408.0,73,Large
+Bharat Heavy Electricals Ltd.,Capital Goods,BHEL,BHEL.NS,1310822760448.0,74,Large
+Tech Mahindra Ltd.,Information Technology,TECHM,TECHM.NS,1282227830784.0,75,Large
+Bank of Baroda,Financial Services,BANKBARODA,BANKBARODA.NS,1281722155008.0,76,Large
+Apollo Hospitals Enterprise Ltd.,Healthcare,APOLLOHOSP,APOLLOHOSP.NS,1270624944128.0,77,Large
+Tata Motors Passenger Vehicles Ltd.,Automobile and Auto Components,TMPV,TMPV.NS,1260547997696.0,78,Large
+Muthoot Finance Ltd.,Financial Services,MUTHOOTFIN,MUTHOOTFIN.NS,1254388269056.0,79,Large
+Siemens Ltd.,Capital Goods,SIEMENS,SIEMENS.NS,1244641230848.0,80,Large
+HDFC Life Insurance Company Ltd.,Financial Services,HDFCLIFE,HDFCLIFE.NS,1243324350464.0,81,Large
+Bosch Ltd.,Automobile and Auto Components,BOSCHLTD,BOSCHLTD.NS,1236918992896.0,82,Large
+Union Bank of India,Financial Services,UNIONBANK,UNIONBANK.NS,1229621166080.0,83,Large
+GMR Airports Ltd.,Services,GMRAIRPORT,GMRAIRPORT.NS,1214071046144.0,84,Large
+Tata Power Co. Ltd.,Power,TATAPOWER,TATAPOWER.NS,1205282144256.0,85,Large
+Siemens Energy India Ltd.,Capital Goods,ENRIN,ENRIN.NS,1199734390784.0,86,Large
+Bajaj Holdings & Investment Ltd.,Financial Services,BAJAJHLDNG,BAJAJHLDNG.NS,1197406945280.0,87,Large
+Billionbrains Garage Ventures Ltd.,Financial Services,GROWW,GROWW.NS,1195469701120.0,88,Large
+HDFC Asset Management Company Ltd.,Financial Services,HDFCAMC,HDFCAMC.NS,1193113419776.0,89,Large
+Punjab National Bank,Financial Services,PNB,PNB.NS,1192852586496.0,90,Large
+Indian Railway Finance Corporation Ltd.,Financial Services,IRFC,IRFC.NS,1175119986688.0,91,Large
+Cipla Ltd.,Healthcare,CIPLA,CIPLA.NS,1172829896704.0,92,Large
+Zydus Lifesciences Ltd.,Healthcare,ZYDUSLIFE,ZYDUSLIFE.NS,1150121934848.0,93,Large
+GAIL (India) Ltd.,Oil Gas & Consumable Fuels,GAIL,GAIL.NS,1144129585152.0,94,Large
+LTM Ltd.,Information Technology,LTM,LTM.NS,1143895621632.0,95,Large
+Lupin Ltd.,Healthcare,LUPIN,LUPIN.NS,1138600443904.0,96,Large
+GE Vernova T&D India Ltd.,Capital Goods,GVT&D,GVT&D.NS,1137051435008.0,97,Large
+Canara Bank,Financial Services,CANBK,CANBK.NS,1134103494656.0,98,Large
+Dr. Reddy's Laboratories Ltd.,Healthcare,DRREDDY,DRREDDY.NS,1127989248000.0,99,Large
+Godrej Consumer Products Ltd.,Fast Moving Consumer Goods,GODREJCP,GODREJCP.NS,1122770092032.0,100,Large
+Tata Consumer Products Ltd.,Fast Moving Consumer Goods,TATACONSUM,TATACONSUM.NS,1113358467072.0,101,Mid
+Aditya Birla Capital Ltd.,Financial Services,ABCAPITAL,ABCAPITAL.NS,1108447199232.0,102,Mid
+Lodha Developers Ltd.,Realty,LODHA,LODHA.NS,1101353975808.0,103,Mid
+Marico Ltd.,Fast Moving Consumer Goods,MARICO,MARICO.NS,1098457022464.0,104,Mid
+Max Healthcare Institute Ltd.,Healthcare,MAXHEALTH,MAXHEALTH.NS,1088475889664.0,105,Mid
+Ambuja Cements Ltd.,Construction Materials,AMBUJACEM,AMBUJACEM.NS,1083131756544.0,106,Mid
+Vedanta Ltd.,Metals & Mining,VEDL,VEDL.NS,1074015698944.0,107,Mid
+LG Electronics India Ltd.,Consumer Durables,LGEINDIA,LGEINDIA.NS,1067233902592.0,108,Mid
+Indian Hotels Co. Ltd.,Consumer Services,INDHOTEL,INDHOTEL.NS,1061809291264.0,109,Mid
+Indian Bank,Financial Services,INDIANB,INDIANB.NS,1058646327296.0,110,Mid
+Jindal Steel Ltd.,Metals & Mining,JINDALSTEL,JINDALSTEL.NS,1053507256320.0,111,Mid
+United Spirits Ltd.,Fast Moving Consumer Goods,UNITDSPR,UNITDSPR.NS,1047021355008.0,112,Mid
+Mankind Pharma Ltd.,Healthcare,MANKIND,MANKIND.NS,1043805962240.0,113,Mid
+Mazagoan Dock Shipbuilders Ltd.,Capital Goods,MAZDOCK,MAZDOCK.NS,1017808420864.0,114,Mid
+Bharat Forge Ltd.,Automobile and Auto Components,BHARATFORG,BHARATFORG.NS,1009532010496.0,115,Mid
+Indus Towers Ltd.,Telecommunication,INDUSTOWER,INDUSTOWER.NS,1009516281856.0,116,Mid
+Hero MotoCorp Ltd.,Automobile and Auto Components,HEROMOTOCO,HEROMOTOCO.NS,999544258560.0,117,Mid
+JSW Energy Ltd.,Power,JSWENERGY,JSWENERGY.NS,997182210048.0,118,Mid
+Lloyds Metals And Energy Ltd.,Metals & Mining,LLOYDSME,LLOYDSME.NS,987783495680.0,119,Mid
+Oracle Financial Services Software Ltd.,Information Technology,OFSS,OFSS.NS,966239518720.0,120,Mid
+Ashok Leyland Ltd.,Capital Goods,ASHOKLEY,ASHOKLEY.NS,964251942912.0,121,Mid
+Shree Cement Ltd.,Construction Materials,SHREECEM,SHREECEM.NS,963716775936.0,122,Mid
+REC Ltd.,Financial Services,RECLTD,RECLTD.NS,938086039552.0,123,Mid
+Lenskart Solutions Ltd.,Consumer Services,LENSKART,LENSKART.NS,927359303680.0,124,Mid
+Aurobindo Pharma Ltd.,Healthcare,AUROPHARMA,AUROPHARMA.NS,910880800768.0,125,Mid
+FSN E-Commerce Ventures Ltd.,Consumer Services,NYKAA,NYKAA.NS,902677397504.0,126,Mid
+IDBI Bank Ltd.,Financial Services,IDBI,IDBI.NS,896320274432.0,127,Mid
+ICICI Lombard General Insurance Company Ltd.,Financial Services,ICICIGI,ICICIGI.NS,895947309056.0,128,Mid
+Meesho Ltd.,Consumer Services,MEESHO,MEESHO.NS,880096313344.0,129,Mid
+Hindustan Petroleum Corporation Ltd.,Oil Gas & Consumable Fuels,HINDPETRO,HINDPETRO.NS,863789580288.0,130,Mid
+L&T Finance Ltd.,Financial Services,LTF,LTF.NS,837391679488.0,131,Mid
+SRF Ltd.,Chemicals,SRF,SRF.NS,833078755328.0,132,Mid
+Federal Bank Ltd.,Financial Services,FEDERALBNK,FEDERALBNK.NS,817802051584.0,133,Mid
+Waaree Energies Ltd.,Capital Goods,WAAREEENER,WAAREEENER.NS,817274945536.0,134,Mid
+Dixon Technologies (India) Ltd.,Consumer Durables,DIXON,DIXON.NS,805138661376.0,135,Mid
+Dabur India Ltd.,Fast Moving Consumer Goods,DABUR,DABUR.NS,804368482304.0,136,Mid
+AU Small Finance Bank Ltd.,Financial Services,AUBANK,AUBANK.NS,798423973888.0,137,Mid
+One 97 Communications Ltd.,Financial Services,PAYTM,PAYTM.NS,798292836352.0,138,Mid
+Laurus Labs Ltd.,Healthcare,LAURUSLABS,LAURUSLABS.NS,798164779008.0,139,Mid
+IndusInd Bank Ltd.,Financial Services,INDUSINDBK,INDUSINDBK.NS,796468445184.0,140,Mid
+NHPC Ltd.,Power,NHPC,NHPC.NS,792452792320.0,141,Mid
+Adani Total Gas Ltd.,Oil Gas & Consumable Fuels,ATGL,ATGL.NS,782184939520.0,142,Mid
+NTPC Green Energy Ltd.,Power,NTPCGREEN,NTPCGREEN.NS,780867928064.0,143,Mid
+Havells India Ltd.,Consumer Durables,HAVELLS,HAVELLS.NS,768389611520.0,144,Mid
+Persistent Systems Ltd.,Information Technology,PERSISTENT,PERSISTENT.NS,763157348352.0,145,Mid
+Nippon Life India Asset Management Ltd.,Financial Services,NAM-INDIA,NAM-INDIA.NS,762424262656.0,146,Mid
+Yes Bank Ltd.,Financial Services,YESBANK,YESBANK.NS,753596170240.0,147,Mid
+Info Edge (India) Ltd.,Consumer Services,NAUKRI,NAUKRI.NS,751019098112.0,148,Mid
+Bharti Hexacom Ltd.,Telecommunication,BHARTIHEXA,BHARTIHEXA.NS,750150025216.0,149,Mid
+Suzlon Energy Ltd.,Capital Goods,SUZLON,SUZLON.NS,747341283328.0,150,Mid
+JSW Infrastructure Ltd.,Services,JSWINFRA,JSWINFRA.NS,746523983872.0,151,Mid
+PB Fintech Ltd.,Financial Services,POLICYBZR,POLICYBZR.NS,742963544064.0,152,Mid
+Phoenix Mills Ltd.,Realty,PHOENIXLTD,PHOENIXLTD.NS,742139822080.0,153,Mid
+NMDC Ltd.,Metals & Mining,NMDC,NMDC.NS,741589778432.0,154,Mid
+Bajaj Housing Finance Ltd.,Financial Services,BAJAJHFL,BAJAJHFL.NS,737336426496.0,155,Mid
+Fortis Healthcare Ltd.,Healthcare,FORTIS,FORTIS.NS,733743808512.0,156,Mid
+Prestige Estates Projects Ltd.,Realty,PRESTIGE,PRESTIGE.NS,720740941824.0,157,Mid
+ICICI Prudential Life Insurance Company Ltd.,Financial Services,ICICIPRULI,ICICIPRULI.NS,707261759488.0,158,Mid
+Torrent Power Ltd.,Power,TORNTPOWER,TORNTPOWER.NS,705313767424.0,159,Mid
+Swiggy Ltd.,Consumer Services,SWIGGY,SWIGGY.NS,693914173440.0,160,Mid
+Oberoi Realty Ltd.,Realty,OBEROIRLTY,OBEROIRLTY.NS,693171322880.0,161,Mid
+IDFC First Bank Ltd.,Financial Services,IDFCFIRSTB,IDFCFIRSTB.NS,692883226624.0,162,Mid
+Oil India Ltd.,Oil Gas & Consumable Fuels,OIL,OIL.NS,688299048960.0,163,Mid
+Steel Authority of India Ltd.,Metals & Mining,SAIL,SAIL.NS,684262817792.0,164,Mid
+Alkem Laboratories Ltd.,Healthcare,ALKEM,ALKEM.NS,677634637824.0,165,Mid
+Multi Commodity Exchange of India Ltd.,Financial Services,MCX,MCX.NS,672731627520.0,166,Mid
+Coforge Ltd.,Information Technology,COFORGE,COFORGE.NS,671207784448.0,167,Mid
+Biocon Ltd.,Healthcare,BIOCON,BIOCON.NS,662552707072.0,168,Mid
+Indian Overseas Bank,Financial Services,IOB,IOB.NS,655301738496.0,169,Mid
+UNO Minda Ltd.,Automobile and Auto Components,UNOMINDA,UNOMINDA.NS,652075925504.0,170,Mid
+Bank of India,Financial Services,BANKINDIA,BANKINDIA.NS,648345419776.0,171,Mid
+Schaeffler India Ltd.,Automobile and Auto Components,SCHAEFFLER,SCHAEFFLER.NS,642470576128.0,172,Mid
+Bank of Maharashtra,Financial Services,MAHABANK,MAHABANK.NS,639860473856.0,173,Mid
+Glenmark Pharmaceuticals Ltd.,Healthcare,GLENMARK,GLENMARK.NS,639156551680.0,174,Mid
+General Insurance Corporation of India,Financial Services,GICRE,GICRE.NS,636057681920.0,175,Mid
+National Aluminium Co. Ltd.,Metals & Mining,NATIONALUM,NATIONALUM.NS,629138194432.0,176,Mid
+Godrej Properties Ltd.,Realty,GODREJPROP,GODREJPROP.NS,615434747904.0,177,Mid
+HDB Financial Services Ltd.,Financial Services,HDBFS,HDBFS.NS,610964537344.0,178,Mid
+Coromandel International Ltd.,Chemicals,COROMANDEL,COROMANDEL.NS,610903785472.0,179,Mid
+Linde India Ltd.,Chemicals,LINDEINDIA,LINDEINDIA.NS,609014644736.0,180,Mid
+Berger Paints India Ltd.,Consumer Durables,BERGEPAINT,BERGEPAINT.NS,593145626624.0,181,Mid
+MRF Ltd.,Automobile and Auto Components,MRF,MRF.NS,588034473984.0,182,Mid
+RBL Bank Ltd.,Financial Services,RBLBANK,RBLBANK.NS,580864114688.0,183,Mid
+Tube Investments of India Ltd.,Automobile and Auto Components,TIINDIA,TIINDIA.NS,576601325568.0,184,Mid
+SBI Cards and Payment Services Ltd.,Financial Services,SBICARD,SBICARD.NS,575679234048.0,185,Mid
+Jindal Stainless Ltd.,Metals & Mining,JSL,JSL.NS,573015916544.0,186,Mid
+Motilal Oswal Financial Services Ltd.,Financial Services,MOTILALOFS,MOTILALOFS.NS,572611428352.0,187,Mid
+Apar Industries Ltd.,Capital Goods,APARINDS,APARINDS.NS,568626118656.0,188,Mid
+Abbott India Ltd.,Healthcare,ABBOTINDIA,ABBOTINDIA.NS,567887593472.0,189,Mid
+Colgate Palmolive (India) Ltd.,Fast Moving Consumer Goods,COLPAL,COLPAL.NS,564968554496.0,190,Mid
+Fertilisers and Chemicals Travancore Ltd.,Chemicals,FACT,FACT.NS,559070183424.0,191,Mid
+Max Financial Services Ltd.,Financial Services,MFSL,MFSL.NS,552571305984.0,192,Mid
+Vishal Mega Mart Ltd.,Consumer Services,VMM,VMM.NS,549375705088.0,193,Mid
+Radico Khaitan Ltd,Fast Moving Consumer Goods,RADICO,RADICO.NS,548931043328.0,194,Mid
+Tata Communications Ltd.,Telecommunication,TATACOMM,TATACOMM.NS,543498436608.0,195,Mid
+Thermax Ltd.,Capital Goods,THERMAX,THERMAX.NS,530462605312.0,196,Mid
+Sundaram Finance Ltd.,Financial Services,SUNDARMFIN,SUNDARMFIN.NS,527259140096.0,197,Mid
+Bharat Dynamics Ltd.,Capital Goods,BDL,BDL.NS,511611273216.0,198,Mid
+UPL Ltd.,Chemicals,UPL,UPL.NS,507888959488.0,199,Mid
+APL Apollo Tubes Ltd.,Capital Goods,APLAPOLLO,APLAPOLLO.NS,505282756608.0,200,Mid
+KEI Industries Ltd.,Capital Goods,KEI,KEI.NS,488136638464.0,201,Mid
+Piramal Finance Ltd.,Financial Services,PIRAMALFIN,PIRAMALFIN.NS,488102821888.0,202,Mid
+Aegis Logistics Ltd.,Oil Gas & Consumable Fuels,AEGISLOG,AEGISLOG.NS,485678678016.0,203,Mid
+Rail Vikas Nigam Ltd.,Construction,RVNL,RVNL.NS,485100814336.0,204,Mid
+Hindustan Copper Ltd.,Metals & Mining,HINDCOPPER,HINDCOPPER.NS,479112036352.0,205,Mid
+360 ONE WAM Ltd.,Financial Services,360ONE,360ONE.NS,467728433152.0,206,Mid
+Page Industries Ltd.,Textiles,PAGEIND,PAGEIND.NS,466008866816.0,207,Mid
+Premier Energies Ltd.,Capital Goods,PREMIERENE,PREMIERENE.NS,462353268736.0,208,Mid
+Mahindra & Mahindra Financial Services Ltd.,Financial Services,M&MFIN,M&MFIN.NS,461606944768.0,209,Mid
+Ipca Laboratories Ltd.,Healthcare,IPCALAB,IPCALAB.NS,454917029888.0,210,Mid
+MphasiS Ltd.,Information Technology,MPHASIS,MPHASIS.NS,453114200064.0,211,Mid
+Patanjali Foods Ltd.,Fast Moving Consumer Goods,PATANJALI,PATANJALI.NS,450926116864.0,212,Mid
+AIA Engineering Ltd.,Capital Goods,AIAENG,AIAENG.NS,443878342656.0,213,Mid
+Authum Investment & Infrastructure Ltd.,Financial Services,AIIL,AIIL.NS,439728930816.0,214,Mid
+Ather Energy Ltd.,Automobile and Auto Components,ATHERENERG,ATHERENERG.NS,437203402752.0,215,Mid
+Balkrishna Industries Ltd.,Automobile and Auto Components,BALKRISIND,BALKRISIND.NS,435930234880.0,216,Mid
+Gujarat Fluorochemicals Ltd.,Chemicals,FLUOROCHEM,FLUOROCHEM.NS,435060932608.0,217,Mid
+Anthem Biosciences Ltd.,Healthcare,ANTHEM,ANTHEM.NS,430637940736.0,218,Mid
+Voltas Ltd.,Consumer Durables,VOLTAS,VOLTAS.NS,426179526656.0,219,Mid
+Physicswallah Ltd.,Consumer Services,PWL,PWL.NS,425465053184.0,220,Mid
+Housing & Urban Development Corporation Ltd.,Financial Services,HUDCO,HUDCO.NS,421780324352.0,221,Mid
+Gland Pharma Ltd.,Healthcare,GLAND,GLAND.NS,420647174144.0,222,Mid
+Petronet LNG Ltd.,Oil Gas & Consumable Fuels,PETRONET,PETRONET.NS,419400056832.0,223,Mid
+NLC India Ltd.,Power,NLCINDIA,NLCINDIA.NS,419110944768.0,224,Mid
+Aditya Infotech Ltd.,Capital Goods,CPPLUS,CPPLUS.NS,418675654656.0,225,Mid
+Sona BLW Precision Forgings Ltd.,Automobile and Auto Components,SONACOMS,SONACOMS.NS,417509769216.0,226,Mid
+J.K. Cement Ltd.,Construction Materials,JKCEMENT,JKCEMENT.NS,416862208000.0,227,Mid
+Ajanta Pharmaceuticals Ltd.,Healthcare,AJANTPHARM,AJANTPHARM.NS,414099111936.0,228,Mid
+Poonawalla Fincorp Ltd.,Financial Services,POONAWALLA,POONAWALLA.NS,413096706048.0,229,Mid
+Godrej Industries Ltd.,Diversified,GODREJIND,GODREJIND.NS,408532942848.0,230,Mid
+Aster DM Healthcare Ltd.,Healthcare,ASTERDM,ASTERDM.NS,407942725632.0,231,Mid
+Glaxosmithkline Pharmaceuticals Ltd.,Healthcare,GLAXO,GLAXO.NS,407675600896.0,232,Mid
+Narayana Hrudayalaya Ltd.,Healthcare,NH,NH.NS,406707437568.0,233,Mid
+Welspun Corp Ltd.,Capital Goods,WELCORP,WELCORP.NS,406367764480.0,234,Mid
+Supreme Industries Ltd.,Capital Goods,SUPREMEIND,SUPREMEIND.NS,404298006528.0,235,Mid
+PI Industries Ltd.,Chemicals,PIIND,PIIND.NS,402362499072.0,236,Mid
+Indian Railway Catering And Tourism Corporation Ltd.,Consumer Services,IRCTC,IRCTC.NS,400559996928.0,237,Mid
+3M India Ltd.,Diversified,3MINDIA,3MINDIA.NS,397206355968.0,238,Mid
+K.P.R. Mill Ltd.,Textiles,KPRMILL,KPRMILL.NS,393147416576.0,239,Mid
+ITC Hotels Ltd.,Consumer Services,ITCHOTELS,ITCHOTELS.NS,389079105536.0,240,Mid
+J.B. Chemicals & Pharmaceuticals Ltd.,Healthcare,JBCHEPHARM,JBCHEPHARM.NS,388873191424.0,241,Mid
+Delhivery Ltd.,Services,DELHIVERY,DELHIVERY.NS,387828449280.0,242,Mid
+Navin Fluorine International Ltd.,Chemicals,NAVINFLUOR,NAVINFLUOR.NS,387055124480.0,243,Mid
+Cochin Shipyard Ltd.,Capital Goods,COCHINSHIP,COCHINSHIP.NS,380335882240.0,244,Mid
+Endurance Technologies Ltd.,Automobile and Auto Components,ENDURANCE,ENDURANCE.NS,375288463360.0,245,Mid
+Kalyan Jewellers India Ltd.,Consumer Durables,KALYANKJIL,KALYANKJIL.NS,366364590080.0,246,Mid
+Astral Ltd.,Capital Goods,ASTRAL,ASTRAL.NS,365229899776.0,247,Mid
+Container Corporation of India Ltd.,Services,CONCOR,CONCOR.NS,360054882304.0,248,Mid
+United Breweries Ltd.,Fast Moving Consumer Goods,UBL,UBL.NS,359220838400.0,249,Mid
+Schneider Electric Infrastructure Ltd.,Capital Goods,SCHNEIDER,SCHNEIDER.NS,356886675456.0,250,Mid
+Global Health Ltd.,Healthcare,MEDANTA,MEDANTA.NS,355864379392.0,251,Small
+Exide Industries Ltd.,Automobile and Auto Components,EXIDEIND,EXIDEIND.NS,352325009408.0,252,Small
+Indian Renewable Energy Development Agency Ltd.,Financial Services,IREDA,IREDA.NS,351603392512.0,253,Small
+Nuvama Wealth Management Ltd.,Financial Services,NUVAMA,NUVAMA.NS,349925998592.0,254,Small
+Emcure Pharmaceuticals Ltd.,Healthcare,EMCURE,EMCURE.NS,349675356160.0,255,Small
+Star Health and Allied Insurance Company Ltd.,Financial Services,STARHEALTH,STARHEALTH.NS,347010990080.0,256,Small
+HFCL Ltd.,Telecommunication,HFCL,HFCL.NS,345900777472.0,257,Small
+L&T Technology Services Ltd.,Information Technology,LTTS,LTTS.NS,341678751744.0,258,Small
+Anand Rathi Wealth Ltd.,Financial Services,ANANDRATHI,ANANDRATHI.NS,340716683264.0,259,Small
+Tata Investment Corporation Ltd.,Financial Services,TATAINVEST,TATAINVEST.NS,337900666880.0,260,Small
+Honeywell Automation India Ltd.,Capital Goods,HONAUT,HONAUT.NS,337438277632.0,261,Small
+Dalmia Bharat Ltd.,Construction Materials,DALBHARAT,DALBHARAT.NS,335809282048.0,262,Small
+Aditya Birla Sun Life AMC Ltd.,Financial Services,ABSLAMC,ABSLAMC.NS,334955479040.0,263,Small
+Godfrey Phillips India Ltd.,Fast Moving Consumer Goods,GODFRYPHLP,GODFRYPHLP.NS,332927467520.0,264,Small
+UCO Bank,Financial Services,UCOBANK,UCOBANK.NS,331044356096.0,265,Small
+Bandhan Bank Ltd.,Financial Services,BANDHANBNK,BANDHANBNK.NS,330432118784.0,266,Small
+Blue Star Ltd.,Consumer Durables,BLUESTARCO,BLUESTARCO.NS,330058432512.0,267,Small
+Kirloskar Oil Eng Ltd.,Capital Goods,KIRLOSENG,KIRLOSENG.NS,329997910016.0,268,Small
+Hexaware Technologies Ltd.,Information Technology,HEXT,HEXT.NS,329716334592.0,269,Small
+Escorts Kubota Ltd.,Capital Goods,ESCORTS,ESCORTS.NS,327760576512.0,270,Small
+Aegis Vopak Terminals Ltd.,Oil Gas & Consumable Fuels,AEGISVOPAK,AEGISVOPAK.NS,326104088576.0,271,Small
+Himadri Speciality Chemical Ltd.,Chemicals,HSCL,HSCL.NS,324697751552.0,272,Small
+Krishna Institute of Medical Sciences Ltd.,Healthcare,KIMS,KIMS.NS,322371944448.0,273,Small
+Manappuram Finance Ltd.,Financial Services,MANAPPURAM,MANAPPURAM.NS,321346895872.0,274,Small
+Cholamandalam Financial Holdings Ltd.,Financial Services,CHOLAHLDNG,CHOLAHLDNG.NS,319090229248.0,275,Small
+Inventurus Knowledge Solutions Ltd.,Information Technology,IKS,IKS.NS,317128507392.0,276,Small
+Garden Reach Shipbuilders & Engineers Ltd.,Capital Goods,GRSE,GRSE.NS,308752023552.0,277,Small
+Angel One Ltd.,Financial Services,ANGELONE,ANGELONE.NS,306759663616.0,278,Small
+The New India Assurance Company Ltd.,Financial Services,NIACL,NIACL.NS,304879992832.0,279,Small
+Wockhardt Ltd.,Healthcare,WOCKPHARMA,WOCKPHARMA.NS,301812973568.0,280,Small
+Jubilant Foodworks Ltd.,Consumer Services,JUBLFOOD,JUBLFOOD.NS,299209064448.0,281,Small
+LIC Housing Finance Ltd.,Financial Services,LICHSGFIN,LICHSGFIN.NS,298986733568.0,282,Small
+Cupid Ltd.,Fast Moving Consumer Goods,CUPID,CUPID.NS,297317924864.0,283,Small
+Tata Technologies Ltd.,Information Technology,TATATECH,TATATECH.NS,295016955904.0,284,Small
+Karur Vysya Bank Ltd.,Financial Services,KARURVYSYA,KARURVYSYA.NS,294190481408.0,285,Small
+Central Bank of India,Financial Services,CENTRALBK,CENTRALBK.NS,290821537792.0,286,Small
+PNB Housing Finance Ltd.,Financial Services,PNBHOUSING,PNBHOUSING.NS,289176616960.0,287,Small
+Go Digit General Insurance Ltd.,Financial Services,GODIGIT,GODIGIT.NS,287591956480.0,288,Small
+CRISIL Ltd.,Financial Services,CRISIL,CRISIL.NS,287496044544.0,289,Small
+Apollo Tyres Ltd.,Automobile and Auto Components,APOLLOTYRE,APOLLOTYRE.NS,287413338112.0,290,Small
+Sterlite Technologies Ltd.,Telecommunication,STLTECH,STLTECH.NS,285674864640.0,291,Small
+Central Depository Services (India) Ltd.,Financial Services,CDSL,CDSL.NS,284239986688.0,292,Small
+SJVN Ltd.,Power,SJVN,SJVN.NS,282159284224.0,293,Small
+ITI Ltd.,Telecommunication,ITI,ITI.NS,281297190912.0,294,Small
+Dr. Lal Path Labs Ltd.,Healthcare,LALPATHLAB,LALPATHLAB.NS,280656248832.0,295,Small
+Acutaas Chemicals Ltd.,Healthcare,ACUTAAS,ACUTAAS.NS,277624979456.0,296,Small
+Motherson Sumi Wiring India Ltd.,Automobile and Auto Components,MSUMI,MSUMI.NS,273953964032.0,297,Small
+ZF Commercial Vehicle Control Systems India Ltd.,Automobile and Auto Components,ZFCVINDIA,ZFCVINDIA.NS,270822948864.0,298,Small
+Amber Enterprises India Ltd.,Consumer Durables,AMBER,AMBER.NS,268916736000.0,299,Small
+Shyam Metalics and Energy Ltd.,Capital Goods,SHYAMMETL,SHYAMMETL.NS,267638816768.0,300,Small
+NBCC (India) Ltd.,Construction,NBCC,NBCC.NS,266058006528.0,301,Small
+Syrma SGS Technology Ltd.,Capital Goods,SYRMA,SYRMA.NS,261199462400.0,302,Small
+PTC Industries Ltd.,Capital Goods,PTCIL,PTCIL.NS,261005279232.0,303,Small
+ACC Ltd.,Construction Materials,ACC,ACC.NS,259972694016.0,304,Small
+ACME Solar Holdings Ltd.,Power,ACMESOLAR,ACMESOLAR.NS,259314909184.0,305,Small
+Mangalore Refinery & Petrochemicals Ltd.,Oil Gas & Consumable Fuels,MRPL,MRPL.NS,256738197504.0,306,Small
+Cemindia Projects Ltd.,Construction,CEMPRO,CEMPRO.NS,256650657792.0,307,Small
+Sai Life Sciences Ltd.,Healthcare,SAILIFE,SAILIFE.NS,256568868864.0,308,Small
+Gillette India Ltd.,Fast Moving Consumer Goods,GILLETTE,GILLETTE.NS,256136085504.0,309,Small
+CreditAccess Grameen Ltd.,Financial Services,CREDITACC,CREDITACC.NS,253462151168.0,310,Small
+R R Kabel Ltd.,Capital Goods,RRKABEL,RRKABEL.NS,247757602816.0,311,Small
+Force Motors Ltd.,Automobile and Auto Components,FORCEMOT,FORCEMOT.NS,247437017088.0,312,Small
+IRB Infrastructure Developers Ltd.,Construction,IRB,IRB.NS,247357440000.0,313,Small
+Data Patterns (India) Ltd.,Capital Goods,DATAPATTNS,DATAPATTNS.NS,246155902976.0,314,Small
+Timken India Ltd.,Capital Goods,TIMKEN,TIMKEN.NS,245280768000.0,315,Small
+Neuland Laboratories Ltd.,Healthcare,NEULANDLAB,NEULANDLAB.NS,242484903936.0,316,Small
+Netweb Technologies India Ltd.,Information Technology,NETWEB,NETWEB.NS,240904650752.0,317,Small
+AWL Agri Business Ltd.,Fast Moving Consumer Goods,AWL,AWL.NS,239747760128.0,318,Small
+Aadhar Housing Finance Ltd.,Financial Services,AADHARHFC,AADHARHFC.NS,238698594304.0,319,Small
+Craftsman Automation Ltd.,Automobile and Auto Components,CRAFTSMAN,CRAFTSMAN.NS,237979172864.0,320,Small
+Sumitomo Chemical India Ltd.,Chemicals,SUMICHEM,SUMICHEM.NS,236270632960.0,321,Small
+Piramal Pharma Ltd.,Healthcare,PPLPHARMA,PPLPHARMA.NS,232502870016.0,322,Small
+Kalpataru Projects International Ltd.,Construction,KPIL,KPIL.NS,231038173184.0,323,Small
+Tata Elxsi Ltd.,Information Technology,TATAELXSI,TATAELXSI.NS,230956924928.0,324,Small
+Capri Global Capital Ltd.,Financial Services,CGCL,CGCL.NS,228482711552.0,325,Small
+Rubicon Research Ltd.,Healthcare,RUBICON,RUBICON.NS,227289513984.0,326,Small
+Emmvee Photovoltaic Power Ltd.,Capital Goods,EMMVEE,EMMVEE.NS,227019931648.0,327,Small
+City Union Bank Ltd.,Financial Services,CUB,CUB.NS,225869774848.0,328,Small
+Gabriel India Ltd.,Automobile and Auto Components,GABRIEL,GABRIEL.NS,224444104704.0,329,Small
+IIFL Finance Ltd.,Financial Services,IIFL,IIFL.NS,223064375296.0,330,Small
+Kaynes Technology India Ltd.,Capital Goods,KAYNES,KAYNES.NS,222059003904.0,331,Small
+Asahi India Glass Ltd.,Automobile and Auto Components,ASAHIINDIA,ASAHIINDIA.NS,221965123584.0,332,Small
+The Ramco Cements Ltd.,Construction Materials,RAMCOCEM,RAMCOCEM.NS,221394157568.0,333,Small
+CESC Ltd.,Power,CESC,CESC.NS,220972580864.0,334,Small
+Deepak Nitrite Ltd.,Chemicals,DEEPAKNTR,DEEPAKNTR.NS,220015607808.0,335,Small
+HBL Engineering Ltd.,Capital Goods,HBLENGINE,HBLENGINE.NS,216738725888.0,336,Small
+MTAR Technologies Ltd.,Capital Goods,MTARTECH,MTARTECH.NS,215517085696.0,337,Small
+Redington Ltd.,Services,REDINGTON,REDINGTON.NS,214636150784.0,338,Small
+Granules India Ltd.,Healthcare,GRANULES,GRANULES.NS,213985034240.0,339,Small
+Indraprastha Gas Ltd.,Oil Gas & Consumable Fuels,IGL,IGL.NS,213192228864.0,340,Small
+EIH Ltd.,Consumer Services,EIHOTEL,EIHOTEL.NS,210716459008.0,341,Small
+Carborundum Universal Ltd.,Capital Goods,CARBORUNIV,CARBORUNIV.NS,210704859136.0,342,Small
+Pfizer Ltd.,Healthcare,PFIZER,PFIZER.NS,207635234816.0,343,Small
+Affle 3i Ltd.,Information Technology,AFFLE,AFFLE.NS,207121432576.0,344,Small
+Belrise Industries Ltd.,Automobile and Auto Components,BELRISE,BELRISE.NS,204645515264.0,345,Small
+Urban Company Ltd.,Consumer Services,URBANCO,URBANCO.NS,202541268992.0,346,Small
+Triveni Turbine Ltd.,Capital Goods,TRITURBINE,TRITURBINE.NS,202356047872.0,347,Small
+IFCI Ltd.,Financial Services,IFCI,IFCI.NS,200618639360.0,348,Small
+Sun TV Network Ltd.,Media Entertainment & Publication,SUNTV,SUNTV.NS,199978237952.0,349,Small
+Deepak Fertilisers & Petrochemicals Corp. Ltd.,Chemicals,DEEPAKFERT,DEEPAKFERT.NS,199177027584.0,350,Small
+Eris Lifesciences Ltd.,Healthcare,ERIS,ERIS.NS,198873989120.0,351,Small
+Thangamayil Jewellery Ltd.,Consumer Durables,THANGAMAYL,THANGAMAYL.NS,198085705728.0,352,Small
+Great Eastern Shipping Co. Ltd.,Services,GESHIP,GESHIP.NS,197718261760.0,353,Small
+Sansera Engineering Ltd.,Automobile and Auto Components,SANSERA,SANSERA.NS,196664852480.0,354,Small
+Caplin Point Laboratories Ltd.,Healthcare,CAPLIPOINT,CAPLIPOINT.NS,195106832384.0,355,Small
+Sammaan Capital Ltd.,Financial Services,SAMMAANCAP,SAMMAANCAP.NS,194070642688.0,356,Small
+Sagility Ltd.,Information Technology,SAGILITY,SAGILITY.NS,193994260480.0,357,Small
+Anant Raj Ltd.,Realty,ANANTRAJ,ANANTRAJ.NS,193649770496.0,358,Small
+Kajaria Ceramics Ltd.,Consumer Durables,KAJARIACER,KAJARIACER.NS,192935739392.0,359,Small
+Computer Age Management Services Ltd.,Financial Services,CAMS,CAMS.NS,192755793920.0,360,Small
+Allied Blenders and Distillers Ltd.,Fast Moving Consumer Goods,ABDL,ABDL.NS,191881166848.0,361,Small
+Atul Ltd.,Chemicals,ATUL,ATUL.NS,189384097792.0,362,Small
+SPR Auto Technologies Ltd.,Automobile and Auto Components,SHRIPISTON,SHRIPISTON.NS,188053110784.0,363,Small
+Ola Electric Mobility Ltd.,Automobile and Auto Components,OLAELEC,OLAELEC.NS,187352072192.0,364,Small
+Vardhman Textiles Ltd.,Textiles,VTL,VTL.NS,186601209856.0,365,Small
+Onesource Specialty Pharma Ltd.,Healthcare,ONESOURCE,ONESOURCE.NS,186505789440.0,366,Small
+Gujarat Mineral Development Corporation Ltd.,Metals & Mining,GMDCLTD,GMDCLTD.NS,186443399168.0,367,Small
+Chambal Fertilizers & Chemicals Ltd.,Chemicals,CHAMBLFERT,CHAMBLFERT.NS,185782468608.0,368,Small
+Elgi Equipments Ltd.,Capital Goods,ELGIEQUIP,ELGIEQUIP.NS,185677234176.0,369,Small
+Bayer Cropscience Ltd.,Chemicals,BAYERCROP,BAYERCROP.NS,185264783360.0,370,Small
+Zydus Wellness Ltd.,Fast Moving Consumer Goods,ZYDUSWELL,ZYDUSWELL.NS,183210868736.0,371,Small
+Tata Chemicals Ltd.,Chemicals,TATACHEM,TATACHEM.NS,183067852800.0,372,Small
+Prime Focus Ltd.,Media Entertainment & Publication,PFOCUS,PFOCUS.NS,182778118144.0,373,Small
+JSW Cement Ltd.,Construction Materials,JSWCEMENT,JSWCEMENT.NS,182571597824.0,374,Small
+Ratnamani Metals & Tubes Ltd.,Capital Goods,RATNAMANI,RATNAMANI.NS,182449471488.0,375,Small
+Castrol India Ltd.,Oil Gas & Consumable Fuels,CASTROLIND,CASTROLIND.NS,182354608128.0,376,Small
+Emami Ltd.,Fast Moving Consumer Goods,EMAMILTD,EMAMILTD.NS,181736783872.0,377,Small
+Jammu & Kashmir Bank Ltd.,Financial Services,J&KBANK,J&KBANK.NS,180274593792.0,378,Small
+Chalet Hotels Ltd.,Consumer Services,CHALET,CHALET.NS,179093389312.0,379,Small
+CIE Automotive India Ltd.,Automobile and Auto Components,CIEINDIA,CIEINDIA.NS,177029447680.0,380,Small
+India Cements Ltd.,Construction Materials,INDIACEM,INDIACEM.NS,176873603072.0,381,Small
+Jyoti CNC Automation Ltd.,Capital Goods,JYOTICNC,JYOTICNC.NS,176844193792.0,382,Small
+Aether Industries Ltd.,Chemicals,AETHER,AETHER.NS,176507731968.0,383,Small
+Travel Food Services Ltd.,Consumer Services,TRAVELFOOD,TRAVELFOOD.NS,176358342656.0,384,Small
+NATCO Pharma Ltd.,Healthcare,NATCOPHARM,NATCOPHARM.NS,176270983168.0,385,Small
+Crompton Greaves Consumer Electricals Ltd.,Consumer Durables,CROMPTON,CROMPTON.NS,175491022848.0,386,Small
+TD Power Systems Ltd.,Capital Goods,TDPOWERSYS,TDPOWERSYS.NS,175085191168.0,387,Small
+Sarda Energy and Minerals Ltd.,Metals & Mining,SARDAEN,SARDAEN.NS,174481588224.0,388,Small
+Aarti Industries Ltd.,Chemicals,AARTIIND,AARTIIND.NS,173546586112.0,389,Small
+Choice International Ltd.,Financial Services,CHOICEIN,CHOICEIN.NS,173353533440.0,390,Small
+Century Plyboards (India) Ltd.,Consumer Durables,CENTURYPLY,CENTURYPLY.NS,171573100544.0,391,Small
+Nava Ltd.,Power,NAVA,NAVA.NS,171001102336.0,392,Small
+Pine Labs Ltd.,Financial Services,PINELABS,PINELABS.NS,170724851712.0,393,Small
+Syngene International Ltd.,Healthcare,SYNGENE,SYNGENE.NS,169829629952.0,394,Small
+Black Box Ltd.,Information Technology,BBOX,BBOX.NS,169642754048.0,395,Small
+Poly Medicure Ltd.,Healthcare,POLYMED,POLYMED.NS,169440313344.0,396,Small
+Cohance Lifesciences Ltd.,Healthcare,COHANCE,COHANCE.NS,169390211072.0,397,Small
+Astra Microwave Products Ltd.,Capital Goods,ASTRAMICRO,ASTRAMICRO.NS,169210986496.0,398,Small
+Brigade Enterprises Ltd.,Realty,BRIGADE,BRIGADE.NS,168430256128.0,399,Small
+Firstsource Solutions Ltd.,Services,FSL,FSL.NS,168317976576.0,400,Small
+Kansai Nerolac Paints Ltd.,Consumer Durables,KANSAINER,KANSAINER.NS,168083210240.0,401,Small
+Zen Technologies Ltd.,Capital Goods,ZENTEC,ZENTEC.NS,167590658048.0,402,Small
+Jindal Saw Ltd.,Capital Goods,JINDALSAW,JINDALSAW.NS,166769803264.0,403,Small
+PG Electroplast Ltd.,Consumer Durables,PGEL,PGEL.NS,165766987776.0,404,Small
+INOX India Ltd.,Capital Goods,INOXINDIA,INOXINDIA.NS,163955195904.0,405,Small
+Alembic Pharmaceuticals Ltd.,Healthcare,APLLTD,APLLTD.NS,163019620352.0,406,Small
+Leela Palaces Hotels & Resorts Ltd.,Consumer Services,THELEELA,THELEELA.NS,162854567936.0,407,Small
+Godawari Power & Ispat Ltd.,Capital Goods,GPIL,GPIL.NS,162812002304.0,408,Small
+Five-Star Business Finance Ltd.,Financial Services,FIVESTAR,FIVESTAR.NS,161925349376.0,409,Small
+Garware Hi-Tech Films Ltd.,Capital Goods,GRWRHITECH,GRWRHITECH.NS,161802010624.0,410,Small
+Chennai Petroleum Corporation Ltd.,Oil Gas & Consumable Fuels,CHENNPETRO,CHENNPETRO.NS,161732657152.0,411,Small
+Minda Corporation Ltd.,Automobile and Auto Components,MINDACORP,MINDACORP.NS,161516421120.0,412,Small
+DCM Shriram Ltd.,Diversified,DCMSHRIRAM,DCMSHRIRAM.NS,161504968704.0,413,Small
+KSB Ltd.,Capital Goods,KSB,KSB.NS,161247330304.0,414,Small
+Bikaji Foods International Ltd.,Fast Moving Consumer Goods,BIKAJI,BIKAJI.NS,161173356544.0,415,Small
+TBO Tek Ltd.,Consumer Services,TBOTEK,TBOTEK.NS,160699219968.0,416,Small
+Welspun Living Ltd.,Textiles,WELSPUNLIV,WELSPUNLIV.NS,160450461696.0,417,Small
+Finolex Cables Ltd.,Capital Goods,FINCABLES,FINCABLES.NS,160280428544.0,418,Small
+Gallantt Ispat Ltd.,Capital Goods,GALLANTT,GALLANTT.NS,160198492160.0,419,Small
+Niva Bupa Health Insurance Company Ltd.,Financial Services,NIVABUPA,NIVABUPA.NS,159958712320.0,420,Small
+JBM Auto Ltd.,Automobile and Auto Components,JBMA,JBMA.NS,159006916608.0,421,Small
+CCL Products (I) Ltd.,Fast Moving Consumer Goods,CCL,CCL.NS,158952488960.0,422,Small
+Aequs Ltd.,Capital Goods,AEQUS,AEQUS.NS,158756290560.0,423,Small
+Ceat Ltd.,Automobile and Auto Components,CEATLTD,CEATLTD.NS,157937057792.0,424,Small
+Aditya Birla Real Estate Ltd.,Realty,ABREL,ABREL.NS,155892645888.0,425,Small
+Sobha Ltd.,Realty,SOBHA,SOBHA.NS,155532263424.0,426,Small
+Jubilant Pharmova Ltd.,Healthcare,JUBLPHARMA,JUBLPHARMA.NS,155029356544.0,427,Small
+Usha Martin Ltd.,Capital Goods,USHAMART,USHAMART.NS,154376601600.0,428,Small
+Amara Raja Energy & Mobility Ltd.,Automobile and Auto Components,ARE&M,ARE&M.NS,154217168896.0,429,Small
+KPIT Technologies Ltd.,Information Technology,KPITTECH,KPITTECH.NS,153100599296.0,430,Small
+BEML Ltd.,Capital Goods,BEML,BEML.NS,152635424768.0,431,Small
+Honasa Consumer Ltd.,Fast Moving Consumer Goods,HONASA,HONASA.NS,151552360448.0,432,Small
+International Gemological Institute Ltd.,Services,IGIL,IGIL.NS,151126245376.0,433,Small
+Dr. Agarwal's Health Care Ltd.,Healthcare,AGARWALEYE,AGARWALEYE.NS,149790326784.0,434,Small
+Kfin Technologies Ltd.,Financial Services,KFINTECH,KFINTECH.NS,149772419072.0,435,Small
+Apollo Micro Systems Ltd.,Capital Goods,APOLLO,APOLLO.NS,149141471232.0,436,Small
+Inox Wind Ltd.,Capital Goods,INOXWIND,INOXWIND.NS,148870397952.0,437,Small
+Maharashtra Scooters Ltd.,Financial Services,MAHSCOOTER,MAHSCOOTER.NS,148822818816.0,438,Small
+Kirloskar Brothers Ltd.,Capital Goods,KIRLOSBROS,KIRLOSBROS.NS,147398852608.0,439,Small
+Azad Engineering Ltd.,Capital Goods,AZAD,AZAD.NS,146942853120.0,440,Small
+Anupam Rasayan India Ltd.,Chemicals,ANURAS,ANURAS.NS,144723968000.0,441,Small
+Paradeep Phosphates Ltd.,Chemicals,PARADEEP,PARADEEP.NS,144513351680.0,442,Small
+Rainbow Childrens Medicare Ltd.,Healthcare,RAINBOW,RAINBOW.NS,144258449408.0,443,Small
+Devyani International Ltd.,Consumer Services,DEVYANI,DEVYANI.NS,143477211136.0,444,Small
+Aptus Value Housing Finance India Ltd.,Financial Services,APTUS,APTUS.NS,142976319488.0,445,Small
+Privi Speciality Chemicals Ltd.,Chemicals,PRIVISCL,PRIVISCL.NS,142160904192.0,446,Small
+JSW Dulux Ltd.,Consumer Durables,JSWDULUX,JSWDULUX.NS,141502857216.0,447,Small
+SKF India (Industrial) Ltd.,Capital Goods,SKFINDUS,SKFINDUS.NS,141343145984.0,448,Small
+Arvind Ltd.,Textiles,ARVIND,ARVIND.NS,141306003456.0,449,Small
+Alivus Life Sciences Ltd.,Healthcare,ALIVUS,ALIVUS.NS,140499845120.0,450,Small
+DOMS Industries Ltd.,Fast Moving Consumer Goods,DOMS,DOMS.NS,140020121600.0,451,Small
+eClerx Services Ltd.,Services,ECLERX,ECLERX.NS,138175938560.0,452,Small
+Vijaya Diagnostic Centre Ltd.,Healthcare,VIJAYA,VIJAYA.NS,137819881472.0,453,Small
+Supreme Petrochem Ltd.,Chemicals,SPLPETRO,SPLPETRO.NS,137740288000.0,454,Small
+Va Tech Wabag Ltd.,Utilities,WABAG,WABAG.NS,137380036608.0,455,Small
+Engineers India Ltd.,Construction,ENGINERSIN,ENGINERSIN.NS,136126660608.0,456,Small
+Canara HSBC Life Insurance Company Ltd.,Financial Services,CANHLIFE,CANHLIFE.NS,135537721344.0,457,Small
+Shipping Corporation of India Ltd.,Services,SCI,SCI.NS,135337893888.0,458,Small
+Cartrade Tech Ltd.,Consumer Services,CARTRADE,CARTRADE.NS,133667315712.0,459,Small
+E.I.D. Parry (India) Ltd.,Fast Moving Consumer Goods,EIDPARRY,EIDPARRY.NS,133537955840.0,460,Small
+Concord Biotech Ltd.,Healthcare,CONCORDBIO,CONCORDBIO.NS,133134581760.0,461,Small
+V-Guard Industries Ltd.,Consumer Durables,VGUARD,VGUARD.NS,133094129664.0,462,Small
+Kec International Ltd.,Construction,KEC,KEC.NS,132674076672.0,463,Small
+LT Foods Ltd.,Fast Moving Consumer Goods,LTFOODS,LTFOODS.NS,132476993536.0,464,Small
+Trident Ltd.,Textiles,TRIDENT,TRIDENT.NS,132179460096.0,465,Small
+Gravita India Ltd.,Metals & Mining,GRAVITA,GRAVITA.NS,130188697600.0,466,Small
+Avanti Feeds Ltd.,Fast Moving Consumer Goods,AVANTIFEED,AVANTIFEED.NS,129869340672.0,467,Small
+Shaily Engineering Plastics Ltd.,Consumer Durables,SHAILY,SHAILY.NS,128671703040.0,468,Small
+Atlanta Electricals Ltd.,Capital Goods,ATLANTAELE,ATLANTAELE.NS,127071674368.0,469,Small
+NMDC Steel Ltd.,Metals & Mining,NSLNISP,NSLNISP.NS,126777999360.0,470,Small
+Home First Finance Company India Ltd.,Financial Services,HOMEFIRST,HOMEFIRST.NS,126444158976.0,471,Small
+UTI Asset Management Company Ltd.,Financial Services,UTIAMC,UTIAMC.NS,126391820288.0,472,Small
+Techno Electric & Engineering Company Ltd.,Construction,TECHNOE,TECHNOE.NS,126219935744.0,473,Small
+JM Financial Ltd.,Financial Services,JMFINANCIL,JMFINANCIL.NS,125505290240.0,474,Small
+IRCON International Ltd.,Construction,IRCON,IRCON.NS,125210861568.0,475,Small
+South Indian Bank Ltd.,Financial Services,SOUTHBANK,SOUTHBANK.NS,124803211264.0,476,Small
+Prudent Corporate Advisory Services Ltd.,Financial Services,PRUDENT,PRUDENT.NS,124468477952.0,477,Small
+PCBL Chemical Ltd.,Chemicals,PCBL,PCBL.NS,123862016000.0,478,Small
+Park Medi World Ltd.,Healthcare,PARKHOSPS,PARKHOSPS.NS,123251482624.0,479,Small
+Lloyds Engineering Works Ltd.,Capital Goods,LLOYDSENGG,LLOYDSENGG.NS,121989136384.0,480,Small
+Viyash Scientific Ltd.,Healthcare,VIYASH,VIYASH.NS,121729589248.0,481,Small
+Tamilnad Mercantile Bank Ltd.,Financial Services,TMB,TMB.NS,121629753344.0,482,Small
+Tega Industries Ltd.,Capital Goods,TEGA,TEGA.NS,121609199616.0,483,Small
+Can Fin Homes Ltd.,Financial Services,CANFINHOME,CANFINHOME.NS,121144049664.0,484,Small
+Balrampur Chini Mills Ltd.,Fast Moving Consumer Goods,BALRAMCHIN,BALRAMCHIN.NS,120770904064.0,485,Small
+Jaiprakash Power Ventures Ltd.,Power,JPPOWER,JPPOWER.NS,120346738688.0,486,Small
+Ujjivan Small Finance Bank Ltd.,Financial Services,UJJIVANSFB,UJJIVANSFB.NS,119866662912.0,487,Small
+Aavas Financiers Ltd.,Financial Services,AAVAS,AAVAS.NS,119423254528.0,488,Small
+JK Tyre & Industries Ltd.,Automobile and Auto Components,JKTYRE,JKTYRE.NS,119323025408.0,489,Small
+Jain Resource Recycling Ltd.,Metals & Mining,JAINREC,JAINREC.NS,119296172032.0,490,Small
+Action Construction Equipment Ltd.,Capital Goods,ACE,ACE.NS,118805848064.0,491,Small
+Diamond Power Infrastructure Ltd.,Capital Goods,DIACABS,DIACABS.NS,118542139392.0,492,Small
+Indegene Ltd.,Healthcare,INDGN,INDGN.NS,118487334912.0,493,Small
+Marksans Pharma Ltd.,Healthcare,MARKSANS,MARKSANS.NS,118366371840.0,494,Small
+Graphite India Ltd.,Capital Goods,GRAPHITE,GRAPHITE.NS,117909176320.0,495,Small
+Metropolis Healthcare Ltd.,Healthcare,METROPOLIS,METROPOLIS.NS,117380997120.0,496,Small
+Shilpa Medicare Ltd.,Healthcare,SHILPAMED,SHILPAMED.NS,117309972480.0,497,Small
+Blue Dart Express Ltd.,Services,BLUEDART,BLUEDART.NS,116231282688.0,498,Small
+Olectra Greentech Ltd.,Automobile and Auto Components,OLECTRA,OLECTRA.NS,116209909760.0,499,Small
+Edelweiss Financial Services Ltd.,Financial Services,EDELWEISS,EDELWEISS.NS,115912261632.0,500,Small
+Indiamart Intermesh Ltd.,Consumer Services,INDIAMART,INDIAMART.NS,115676708864.0,501,Small
+Aditya Birla Lifestyle Brands Ltd.,Consumer Services,ABLBL,ABLBL.NS,115487801344.0,502,Small
+Titagarh Rail Systems Ltd.,Capital Goods,TITAGARH,TITAGARH.NS,114654502912.0,503,Small
+Kirloskar Pneumatic Company Ltd.,Capital Goods,KIRLPNU,KIRLPNU.NS,114523611136.0,504,Small
+Elecon Engineering Co. Ltd.,Capital Goods,ELECON,ELECON.NS,114275663872.0,505,Small
+Afcons Infrastructure Ltd.,Construction,AFCONS,AFCONS.NS,114105188352.0,506,Small
+Lloyds Enterprises Ltd.,Metals & Mining,LLOYDSENT,LLOYDSENT.NS,113865506816.0,507,Small
+RITES Ltd.,Construction,RITES,RITES.NS,113148542976.0,508,Small
+Nuvoco Vistas Corporation Ltd.,Construction Materials,NUVOCO,NUVOCO.NS,112629194752.0,509,Small
+Rategain Travel Technologies Ltd.,Information Technology,RATEGAIN,RATEGAIN.NS,112262496256.0,510,Small
+Mahanagar Gas Ltd.,Oil Gas & Consumable Fuels,MGL,MGL.NS,111984361472.0,511,Small
+Nazara Technologies Ltd.,Media Entertainment & Publication,NAZARA,NAZARA.NS,111602589696.0,512,Small
+Tilaknagar Industries Ltd.,Fast Moving Consumer Goods,TI,TI.NS,111498764288.0,513,Small
+Signatureglobal (India) Ltd.,Realty,SIGNATURE,SIGNATURE.NS,110037581824.0,514,Small
+Avalon Technologies Ltd.,Capital Goods,AVALON,AVALON.NS,109564600320.0,515,Small
+Indian Energy Exchange Ltd.,Financial Services,IEX,IEX.NS,108903710720.0,516,Small
+Intellect Design Arena Ltd.,Information Technology,INTELLECT,INTELLECT.NS,108595011584.0,517,Small
+Jupiter Wagons Ltd.,Capital Goods,JWL,JWL.NS,108552085504.0,518,Small
+Godrej Agrovet Ltd.,Fast Moving Consumer Goods,GODREJAGRO,GODREJAGRO.NS,107913945088.0,519,Small
+Jubilant Ingrevia Ltd.,Chemicals,JUBLINGREA,JUBLINGREA.NS,107712512000.0,520,Small
+Bombay Burmah Trading Corporation Ltd.,Fast Moving Consumer Goods,BBTC,BBTC.NS,106716127232.0,521,Small
+IIFL Capital Services Ltd.,Financial Services,IIFLCAPS,IIFLCAPS.NS,106244071424.0,522,Small
+Sanofi Consumer Healthcare India Ltd.,Healthcare,SANOFICONR,SANOFICONR.NS,106163544064.0,523,Small
+Zensar Technolgies Ltd.,Information Technology,ZENSARTECH,ZENSARTECH.NS,106052214784.0,524,Small
+Finolex Industries Ltd.,Capital Goods,FINPIPE,FINPIPE.NS,105577103360.0,525,Small
+Waaree Renewable Technologies Ltd.,Capital Goods,WAAREERTL,WAAREERTL.NS,105504030720.0,526,Small
+Paras Defence and Space Technologies Ltd.,Capital Goods,PARAS,PARAS.NS,104320294912.0,527,Small
+Strides Pharma Science Ltd.,Healthcare,STAR,STAR.NS,103989248000.0,528,Small
+Blackbuck Ltd.,Services,BLACKBUCK,BLACKBUCK.NS,103873626112.0,529,Small
+Swan Corp Ltd.,Chemicals,SWANCORP,SWANCORP.NS,103519141888.0,530,Small
+Reliance Power Ltd.,Power,RPOWER,RPOWER.NS,103228833792.0,531,Small
+Fujiyama Power Systems Ltd.,Capital Goods,UTLSOLAR,UTLSOLAR.NS,103211057152.0,532,Small
+Brainbees Solutions Ltd.,Consumer Services,FIRSTCRY,FIRSTCRY.NS,103158251520.0,533,Small
+Ramkrishna Forgings Ltd.,Automobile and Auto Components,RKFORGE,RKFORGE.NS,102980681728.0,534,Small
+H.E.G. Ltd.,Capital Goods,HEG,HEG.NS,102528958464.0,535,Small
+BLS International Services Ltd.,Consumer Services,BLS,BLS.NS,102407315456.0,536,Small
+SBFC Finance Ltd.,Financial Services,SBFC,SBFC.NS,102349176832.0,537,Small
+WeWork India Management Ltd.,Services,WEWORK,WEWORK.NS,102210314240.0,538,Small
+TSF Investments Ltd.,Financial Services,TSFINV,TSFINV.NS,101948596224.0,539,Small
+Whirlpool of India Ltd.,Consumer Durables,WHIRLPOOL,WHIRLPOOL.NS,101815500800.0,540,Small
+Lumax Auto Technologies Ltd.,Automobile and Auto Components,LUMAXTECH,LUMAXTECH.NS,101698109440.0,541,Small
+Triveni Engineering & Industries Ltd.,Fast Moving Consumer Goods,TRIVENI,TRIVENI.NS,101168660480.0,542,Small
+Karnataka Bank Ltd.,Financial Services,KTKBANK,KTKBANK.NS,100501749760.0,543,Small
+Blue Jet Healthcare Ltd.,Healthcare,BLUEJET,BLUEJET.NS,100462501888.0,544,Small
+Transformers And Rectifiers (India) Ltd.,Capital Goods,TARIL,TARIL.NS,100225368064.0,545,Small
+Railtel Corporation Of India Ltd.,Telecommunication,RAILTEL,RAILTEL.NS,99571138560.0,546,Small
+Varroc Engineering Ltd.,Automobile and Auto Components,VARROC,VARROC.NS,99495288832.0,547,Small
+Akums Drugs and Pharmaceuticals Ltd.,Healthcare,AKUMS,AKUMS.NS,99493371904.0,548,Small
+Sandur Manganese & Iron Ores Ltd.,Metals & Mining,SANDUMA,SANDUMA.NS,99282051072.0,549,Small
+PVR INOX Ltd.,Media Entertainment & Publication,PVRINOX,PVRINOX.NS,98391449600.0,550,Small
+Zee Entertainment Enterprises Ltd.,Media Entertainment & Publication,ZEEL,ZEEL.NS,98328379392.0,551,Small
+Voltamp Transformers Ltd,Capital Goods,VOLTAMP,VOLTAMP.NS,98156298240.0,552,Small
+Medplus Health Services Ltd.,Consumer Services,MEDPLUS,MEDPLUS.NS,98068070400.0,553,Small
+MMTC Ltd.,Services,MMTC,MMTC.NS,97845002240.0,554,Small
+Relaxo Footwears Ltd.,Consumer Durables,RELAXO,RELAXO.NS,97695956992.0,555,Small
+Banco Products (India) Ltd.,Automobile and Auto Components,BANCOINDIA,BANCOINDIA.NS,97286823936.0,556,Small
+Tejas Networks Ltd.,Telecommunication,TEJASNET,TEJASNET.NS,97146937344.0,557,Small
+Healthcare Global Enterprises Ltd.,Healthcare,HCG,HCG.NS,96695582720.0,558,Small
+Manorama Industries Ltd.,Fast Moving Consumer Goods,MANORAMA,MANORAMA.NS,96280584192.0,559,Small
+Vedant Fashions Ltd.,Consumer Services,MANYAVAR,MANYAVAR.NS,95988162560.0,560,Small
+Jupiter Life Line Hospitals Ltd.,Healthcare,JLHL,JLHL.NS,95791964160.0,561,Small
+Lemon Tree Hotels Ltd.,Consumer Services,LEMONTREE,LEMONTREE.NS,95512657920.0,562,Small
+Cyient Ltd.,Information Technology,CYIENT,CYIENT.NS,93706952704.0,563,Small
+Le Travenues Technology Ltd.,Consumer Services,IXIGO,IXIGO.NS,93690953728.0,564,Small
+NCC Ltd.,Construction,NCC,NCC.NS,93203824640.0,565,Small
+Religare Enterprises Ltd.,Financial Services,RELIGARE,RELIGARE.NS,92866756608.0,566,Small
+ASK Automotive Ltd.,Automobile and Auto Components,ASKAUTOLTD,ASKAUTOLTD.NS,92252880896.0,567,Small
+Alkyl Amines Chemicals Ltd.,Chemicals,ALKYLAMINE,ALKYLAMINE.NS,91838070784.0,568,Small
+Sudeep Pharma Ltd.,Chemicals,SUDEEPPHRM,SUDEEPPHRM.NS,91595685888.0,569,Small
+PC Jeweller Ltd.,Consumer Durables,PCJEWELLER,PCJEWELLER.NS,91376132096.0,570,Small
+Pearl Global Industries Ltd.,Textiles,PGIL,PGIL.NS,91015036928.0,571,Small
+Equitas Small Finance Bank Ltd.,Financial Services,EQUITASBNK,EQUITASBNK.NS,90642341888.0,572,Small
+SKY GOLD AND DIAMONDS Ltd.,Consumer Durables,SKYGOLD,SKYGOLD.NS,88998281216.0,573,Small
+Eureka Forbes Ltd.,Consumer Durables,EUREKAFORB,EUREKAFORB.NS,88790605824.0,574,Small
+Saregama India Ltd,Media Entertainment & Publication,SAREGAMA,SAREGAMA.NS,88330158080.0,575,Small
+BlueStone Jewellery and Lifestyle Ltd.,Consumer Durables,BLUESTONE,BLUESTONE.NS,88233009152.0,576,Small
+Bata India Ltd.,Consumer Durables,BATAINDIA,BATAINDIA.NS,88079917056.0,577,Small
+Tips Music Ltd.,Media Entertainment & Publication,TIPSMUSIC,TIPSMUSIC.NS,87078879232.0,578,Small
+Time Technoplast Ltd.,Capital Goods,TIMETECHNO,TIMETECHNO.NS,86934126592.0,579,Small
+Sun Pharma Advanced Research Company Ltd.,Healthcare,SPARC,SPARC.NS,86433079296.0,580,Small
+Embassy Developments Ltd.,Realty,EMBDL,EMBDL.NS,85973565440.0,581,Small
+Quality Power Electrical Equipments Ltd.,Capital Goods,QPOWER,QPOWER.NS,85885501440.0,582,Small
+Clean Science and Technology Ltd.,Chemicals,CLEAN,CLEAN.NS,85440520192.0,583,Small
+Borosil Renewables Ltd.,Capital Goods,BORORENEW,BORORENEW.NS,85411414016.0,584,Small
+KRBL Ltd.,Fast Moving Consumer Goods,KRBL,KRBL.NS,85032591360.0,585,Small
+Jayaswal Neco Industries Ltd.,Capital Goods,JAYNECOIND,JAYNECOIND.NS,84690468864.0,586,Small
+India Shelter Finance Corporation Ltd.,Financial Services,INDIASHLTR,INDIASHLTR.NS,84683399168.0,587,Small
+Thyrocare Technologies Ltd.,Healthcare,THYROCARE,THYROCARE.NS,84674019328.0,588,Small
+Indo Count Industries Ltd.,Textiles,ICIL,ICIL.NS,84658331648.0,589,Small
+Aditya Vision Ltd.,Consumer Services,AVL,AVL.NS,84101152768.0,590,Small
+V2 Retail Ltd.,Consumer Services,V2RETAIL,V2RETAIL.NS,83600449536.0,591,Small
+Star Cement Ltd.,Construction Materials,STARCEMENT,STARCEMENT.NS,82970157056.0,592,Small
+Welspun Enterprises Ltd.,Construction,WELENT,WELENT.NS,82778669056.0,593,Small
+Orkla India Ltd.,Fast Moving Consumer Goods,ORKLAINDIA,ORKLAINDIA.NS,82611355648.0,594,Small
+Sharda Cropchem Ltd.,Chemicals,SHARDACROP,SHARDACROP.NS,82551750656.0,595,Small
+Cera Sanitaryware Ltd,Consumer Durables,CERA,CERA.NS,82224881664.0,596,Small
+Inox Green Energy Services Ltd.,Services,INOXGREEN,INOXGREEN.NS,82141249536.0,597,Small
+Power Mech Projects Ltd.,Construction,POWERMECH,POWERMECH.NS,81974722560.0,598,Small
+Sheela Foam Ltd.,Consumer Durables,SFL,SFL.NS,81738678272.0,599,Small
+Tata Teleservices (Maharashtra) Ltd.,Telecommunication,TTML,TTML.NS,81344544768.0,600,Small
+Cello World Ltd.,Consumer Durables,CELLO,CELLO.NS,81307787264.0,601,Small
+KRN Heat Exchanger and Refrigeration Ltd.,Capital Goods,KRN,KRN.NS,80906690560.0,602,Small
+Maharashtra Seamless Ltd.,Capital Goods,MAHSEAMLES,MAHSEAMLES.NS,80768049152.0,603,Small
+NESCO Ltd.,Services,NESCO,NESCO.NS,80563920896.0,604,Small
+Yatharth Hospital & Trauma Care Services Ltd.,Healthcare,YATHARTH,YATHARTH.NS,79685058560.0,605,Small
+RHI MAGNESITA INDIA LTD.,Capital Goods,RHIM,RHIM.NS,79337848832.0,606,Small
+KPI Green Energy Ltd.,Power,KPIGREEN,KPIGREEN.NS,79266455552.0,607,Small
+Safari Industries (India) Ltd.,Consumer Durables,SAFARI,SAFARI.NS,78907334656.0,608,Small
+Westlife Foodworld Ltd.,Consumer Services,WESTLIFE,WESTLIFE.NS,78818557952.0,609,Small
+Birlasoft Ltd.,Information Technology,BSOFT,BSOFT.NS,78743584768.0,610,Small
+EPL Ltd.,Capital Goods,EPL,EPL.NS,78501756928.0,611,Small
+SKF India Ltd.,Automobile and Auto Components,SKFINDIA,SKFINDIA.NS,78196023296.0,612,Small
+GMR Power and Urban Infra Ltd.,Power,GMRP&UI,GMRP&UI.NS,78179852288.0,613,Small
+Mishra Dhatu Nigam Ltd.,Capital Goods,MIDHANI,MIDHANI.NS,77792935936.0,614,Small
+Sonata Software Ltd.,Information Technology,SONATSOFTW,SONATSOFTW.NS,77474766848.0,615,Small
+P N Gadgil Jewellers Ltd.,Consumer Durables,PNGJL,PNGJL.NS,77313040384.0,616,Small
+Pricol Ltd.,Automobile and Auto Components,PRICOLLTD,PRICOLLTD.NS,75895611392.0,617,Small
+Gujarat Narmada Valley Fertilizers and Chemicals Ltd.,Chemicals,GNFC,GNFC.NS,75446697984.0,618,Small
+Redtape Ltd.,Consumer Durables,REDTAPE,REDTAPE.NS,75375321088.0,619,Small
+Gujarat Pipavav Port Ltd.,Services,GPPL,GPPL.NS,74555760640.0,620,Small
+Birla Corporation Ltd.,Construction Materials,BIRLACORPN,BIRLACORPN.NS,74545020928.0,621,Small
+Gujarat Ambuja Exports Ltd.,Fast Moving Consumer Goods,GAEL,GAEL.NS,73992757248.0,622,Small
+Sudarshan Chemical Industries Ltd.,Chemicals,SUDARSCHEM,SUDARSCHEM.NS,73549438976.0,623,Small
+Shakti Pumps (India) Ltd.,Capital Goods,SHAKTIPUMP,SHAKTIPUMP.NS,73545187328.0,624,Small
+Indian Metals & Ferro Alloys Ltd.,Metals & Mining,IMFA,IMFA.NS,73361391616.0,625,Small
+Dynamatic Technologies Ltd.,Capital Goods,DYNAMATECH,DYNAMATECH.NS,73109880832.0,626,Small
+Aditya Birla Fashion and Retail Ltd.,Consumer Services,ABFRL,ABFRL.NS,72556429312.0,627,Small
+Tanla Platforms Ltd.,Information Technology,TANLA,TANLA.NS,72305565696.0,628,Small
+India Glycols Ltd.,Fast Moving Consumer Goods,INDIAGLYCO,INDIAGLYCO.NS,72254849024.0,629,Small
+Rashtriya Chemicals & Fertilizers Ltd.,Chemicals,RCF,RCF.NS,72215969792.0,630,Small
+Sri Lotus Developers and Realty Ltd.,Realty,LOTUSDEV,LOTUSDEV.NS,71431856128.0,631,Small
+JK Lakshmi Cement Ltd.,Construction Materials,JKLAKSHMI,JKLAKSHMI.NS,71165788160.0,632,Small
+Jeena Sikho Lifecare Ltd.,Consumer Services,JSLL,JSLL.NS,70901137408.0,633,Small
+Campus Activewear Ltd.,Consumer Durables,CAMPUS,CAMPUS.NS,70728278016.0,634,Small
+Jyothy Labs Ltd.,Fast Moving Consumer Goods,JYOTHYLAB,JYOTHYLAB.NS,69741379584.0,635,Small
+Dilip Buildcon Ltd.,Construction,DBL,DBL.NS,69729443840.0,636,Small
+Transrail Lighting Ltd.,Capital Goods,TRANSRAILL,TRANSRAILL.NS,67953688576.0,637,Small
+Supriya Lifescience Ltd.,Healthcare,SUPRIYA,SUPRIYA.NS,67798712320.0,638,Small
+Newgen Software Technologies Ltd.,Information Technology,NEWGEN,NEWGEN.NS,67756560384.0,639,Small
+Rain Industries Ltd,Chemicals,RAIN,RAIN.NS,67575209984.0,640,Small
+Balaji Amines Ltd.,Chemicals,BALAMINES,BALAMINES.NS,66998788096.0,641,Small
+Ethos Ltd.,Consumer Durables,ETHOSLTD,ETHOSLTD.NS,66947743744.0,642,Small
+Vikram Solar Ltd.,Capital Goods,VIKRAMSOLR,VIKRAMSOLR.NS,66477535232.0,643,Small
+Praj Industries Ltd.,Capital Goods,PRAJIND,PRAJIND.NS,66356523008.0,644,Small
+AXISCADES Technologies Ltd.,Capital Goods,AXISCADES,AXISCADES.NS,65455190016.0,645,Small
+Archean Chemical Industries Ltd.,Chemicals,ACI,ACI.NS,65371217920.0,646,Small
+JK Paper Ltd.,Forest Materials,JKPAPER,JKPAPER.NS,65338220544.0,647,Small
+Piccadily Agro Industries Ltd.,Fast Moving Consumer Goods,PICCADIL,PICCADIL.NS,65001603072.0,648,Small
+Gujarat State Fertilizers & Chemicals Ltd.,Chemicals,GSFC,GSFC.NS,64166838272.0,649,Small
+Aarti Pharmalabs Ltd.,Healthcare,AARTIPHARM,AARTIPHARM.NS,63430533120.0,650,Small
+Alok Industries Ltd.,Textiles,ALOKINDS,ALOKINDS.NS,63356469248.0,651,Small
+Skipper Ltd.,Capital Goods,SKIPPER,SKIPPER.NS,62520606720.0,652,Small
+Hindustan Construction Co. Ltd.,Construction,HCC,HCC.NS,62421921792.0,653,Small
+Arvind Fashions Ltd.,Consumer Services,ARVINDFASN,ARVINDFASN.NS,62343372800.0,654,Small
+Latent View Analytics Ltd.,Information Technology,LATENTVIEW,LATENTVIEW.NS,62294761472.0,655,Small
+V-Mart Retail Ltd.,Consumer Services,VMART,VMART.NS,62238355456.0,656,Small
+Jai Balaji Industries Ltd.,Metals & Mining,JAIBALAJI,JAIBALAJI.NS,62179061760.0,657,Small
+Gokaldas Exports Ltd.,Textiles,GOKEX,GOKEX.NS,61971173376.0,658,Small
+TVS Supply Chain Solutions Ltd.,Services,TVSSCS,TVSSCS.NS,61447553024.0,659,Small
+PNC Infratech Ltd.,Construction,PNCINFRA,PNCINFRA.NS,61425737728.0,660,Small
+Valor Estate Ltd.,Realty,DBREALTY,DBREALTY.NS,61194334208.0,661,Small
+Gokul Agro Resources Ltd.,Fast Moving Consumer Goods,GOKULAGRO,GOKULAGRO.NS,61162627072.0,662,Small
+Sapphire Foods India Ltd.,Consumer Services,SAPPHIRE,SAPPHIRE.NS,60773650432.0,663,Small
+Ashapura Minechem Ltd.,Metals & Mining,ASHAPURMIN,ASHAPURMIN.NS,60310396928.0,664,Small
+CSB Bank Ltd.,Financial Services,CSBBANK,CSBBANK.NS,59910324224.0,665,Small
+DCB Bank Ltd.,Financial Services,DCBBANK,DCBBANK.NS,59565002752.0,666,Small
+Fiem Industries Ltd,Automobile and Auto Components,FIEMIND,FIEMIND.NS,58932355072.0,667,Small
+AvenuesAI Ltd.,Financial Services,CCAVENUE,CCAVENUE.NS,58620370944.0,668,Small
+Fedbank Financial Services Ltd.,Financial Services,FEDFINA,FEDFINA.NS,58530336768.0,669,Small
+Prism Johnson Ltd.,Construction Materials,PRSMJOHNSN,PRSMJOHNSN.NS,57966546944.0,670,Small
+Ahluwalia Contracts (India) Ltd.,Construction,AHLUCONT,AHLUCONT.NS,57130340352.0,671,Small
+Surya Roshni Ltd.,Capital Goods,SURYAROSNI,SURYAROSNI.NS,56644427776.0,672,Small
+Seshaasai Technologies Ltd.,Financial Services,STYL,STYL.NS,56267976704.0,673,Small
+MOIL Ltd.,Metals & Mining,MOIL,MOIL.NS,56121221120.0,674,Small
+Sterling and Wilson Renewable Energy Ltd.,Construction,SWSOLAR,SWSOLAR.NS,56068616192.0,675,Small
+SML Mahindra Ltd.,Capital Goods,SMLMAH,SMLMAH.NS,55530598400.0,676,Small
+Jamna Auto Industries Ltd.,Automobile and Auto Components,JAMNAAUTO,JAMNAAUTO.NS,54149988352.0,677,Small
+Subros Ltd.,Capital Goods,SUBROS,SUBROS.NS,53923872768.0,678,Small
+Saatvik Green Energy Ltd.,Capital Goods,SAATVIKGL,SAATVIKGL.NS,53835325440.0,679,Small
+Senco Gold Ltd.,Consumer Durables,SENCO,SENCO.NS,53616201728.0,680,Small
+NEOGEN CHEMICALS LTD.,Chemicals,NEOGEN,NEOGEN.NS,53544861696.0,681,Small
+Mrs. Bectors Food Specialities Ltd.,Fast Moving Consumer Goods,BECTORFOOD,BECTORFOOD.NS,53149282304.0,682,Small
+Smartworks Coworking Spaces Ltd.,Services,SMARTWORKS,SMARTWORKS.NS,53131866112.0,683,Small
+Entero Healthcare Solutions Ltd.,Consumer Services,ENTERO,ENTERO.NS,52667269120.0,684,Small
+Happiest Minds Technologies Ltd.,Information Technology,HAPPSTMNDS,HAPPSTMNDS.NS,52516548608.0,685,Small
+C.E. Info Systems Ltd.,Information Technology,MAPMYINDIA,MAPMYINDIA.NS,52337881088.0,686,Small
+Indigo Paints Ltd.,Consumer Durables,INDIGOPNTS,INDIGOPNTS.NS,52181012480.0,687,Small
+Balu Forge Industries Ltd.,Capital Goods,BALUFORGE,BALUFORGE.NS,52102832128.0,688,Small
+Puravankara Ltd.,Realty,PURVA,PURVA.NS,52092301312.0,689,Small
+Restaurant Brands Asia Ltd.,Consumer Services,RBA,RBA.NS,51784663040.0,690,Small
+Greaves Cotton Ltd.,Capital Goods,GREAVESCOT,GREAVESCOT.NS,51703570432.0,691,Small
+Electronics Mart India Ltd.,Consumer Services,EMIL,EMIL.NS,51444760576.0,692,Small
+PTC India Ltd.,Power,PTC,PTC.NS,51200561152.0,693,Small
+Mastek Ltd.,Information Technology,MASTEK,MASTEK.NS,50841280512.0,694,Small
+Datamatics Global Services Ltd.,Information Technology,DATAMATICS,DATAMATICS.NS,50600976384.0,695,Small
+IFB Industries Ltd.,Consumer Durables,IFBIND,IFBIND.NS,50539098112.0,696,Small
+Thomas Cook (India) Ltd.,Consumer Services,THOMASCOOK,THOMASCOOK.NS,50309632000.0,697,Small
+Canara Robeco Asset Management Company Ltd.,Financial Services,CRAMC,CRAMC.NS,49989959680.0,698,Small
+Ion Exchange (India) Ltd.,Utilities,IONEXCHANG,IONEXCHANG.NS,49860591616.0,699,Small
+Shree Renuka Sugars Ltd.,Fast Moving Consumer Goods,RENUKA,RENUKA.NS,49615093760.0,700,Small
+Network18 Media & Investments Ltd.,Media Entertainment & Publication,NETWORK18,NETWORK18.NS,49284599808.0,701,Small
+Sunteck Realty Ltd.,Realty,SUNTECK,SUNTECK.NS,48413818880.0,702,Small
+Oswal Pumps Ltd.,Capital Goods,OSWALPUMPS,OSWALPUMPS.NS,48372277248.0,703,Small
+Texmaco Rail & Eng. Ltd.,Capital Goods,TEXRAIL,TEXRAIL.NS,48323305472.0,704,Small
+MSTC Ltd.,Services,MSTCLTD,MSTCLTD.NS,47959998464.0,705,Small
+Electrosteel Castings Ltd.,Capital Goods,ELECTCAST,ELECTCAST.NS,47835119616.0,706,Small
+RattanIndia Power Ltd.,Power,RTNPOWER,RTNPOWER.NS,47793938432.0,707,Small
+Refex Industries Ltd.,Utilities,REFEX,REFEX.NS,47615152128.0,708,Small
+Jana Small Finance Bank Ltd.,Financial Services,JSFB,JSFB.NS,47519346688.0,709,Small
+Justdial Ltd.,Consumer Services,JUSTDIAL,JUSTDIAL.NS,47197962240.0,710,Small
+Aurionpro Solution Ltd.,Information Technology,AURIONPRO,AURIONPRO.NS,46931496960.0,711,Small
+Kaveri Seed Company Ltd.,Fast Moving Consumer Goods,KSCL,KSCL.NS,46258339840.0,712,Small
+Optiemus Infracom Ltd.,Telecommunication,OPTIEMUS,OPTIEMUS.NS,46189117440.0,713,Small
+Raymond Lifestyle Ltd.,Textiles,RAYMONDLSL,RAYMONDLSL.NS,45700657152.0,714,Small
+RattanIndia Enterprises Ltd.,Consumer Services,RTNINDIA,RTNINDIA.NS,45251686400.0,715,Small
+The Anup Engineering Ltd.,Capital Goods,ANUP,ANUP.NS,45068791808.0,716,Small
+Rallis India Ltd.,Chemicals,RALLIS,RALLIS.NS,44900921344.0,717,Small
+Quess Corp Ltd.,Services,QUESS,QUESS.NS,44695937024.0,718,Small
+Websol Energy System Ltd.,Capital Goods,WEBELSOLAR,WEBELSOLAR.NS,44141395968.0,719,Small
+Laxmi Organic Industries Ltd.,Chemicals,LXCHEM,LXCHEM.NS,43156291584.0,720,Small
+V.I.P. Industries Ltd.,Consumer Durables,VIPIND,VIPIND.NS,43013296128.0,721,Small
+CMS Info Systems Ltd.,Services,CMSINFO,CMSINFO.NS,42720923648.0,722,Small
+Wakefit Innovations Ltd.,Consumer Durables,WAKEFIT,WAKEFIT.NS,41847197696.0,723,Small
+Capillary Technologies India Ltd.,Information Technology,CAPILLARY,CAPILLARY.NS,41083043840.0,724,Small
+Enviro Infra Engineers Ltd.,Utilities,EIEL,EIEL.NS,40633442304.0,725,Small
+Styrenix Performance Materials Ltd.,Chemicals,STYRENIX,STYRENIX.NS,39992881152.0,726,Small
+Vaibhav Global Ltd.,Consumer Durables,VAIBHAVGBL,VAIBHAVGBL.NS,39649910784.0,727,Small
+Hemisphere Properties India Ltd.,Services,HEMIPROP,HEMIPROP.NS,39415644160.0,728,Small
+GHCL Ltd.,Chemicals,GHCL,GHCL.NS,39094861824.0,729,Small
+Samhi Hotels Ltd.,Consumer Services,SAMHI,SAMHI.NS,38595911680.0,730,Small
+Bajaj Electricals Ltd,Consumer Durables,BAJAJELEC,BAJAJELEC.NS,38160388096.0,731,Small
+TARC Ltd.,Realty,TARC,TARC.NS,37627731968.0,732,Small
+H.G. Infra Engineering Ltd.,Construction,HGINFRA,HGINFRA.NS,36593577984.0,733,Small
+National Fertilizers Ltd.,Chemicals,NFL,NFL.NS,36508844032.0,734,Small
+Ellenbarrie Industrial Gases Ltd.,Chemicals,ELLEN,ELLEN.NS,36431851520.0,735,Small
+Ashoka Buildcon Ltd.,Construction,ASHOKA,ASHOKA.NS,36120657920.0,736,Small
+Share India Securities Ltd.,Financial Services,SHAREINDIA,SHAREINDIA.NS,36086521856.0,737,Small
+KNR Constructions Ltd.,Construction,KNRCON,KNRCON.NS,35922096128.0,738,Small
+Advanced Enzyme Tech Ltd.,Healthcare,ADVENZYMES,ADVENZYMES.NS,35837964288.0,739,Small
+Aarti Drugs Ltd.,Healthcare,AARTIDRUGS,AARTIDRUGS.NS,35499466752.0,740,Small
+Route Mobile Ltd.,Telecommunication,ROUTE,ROUTE.NS,34966708224.0,741,Small
+Crizac Ltd.,Consumer Services,CRIZAC,CRIZAC.NS,34928254976.0,742,Small
+GMM Pfaudler Ltd.,Capital Goods,GMMPFAUDLR,GMMPFAUDLR.NS,34497925120.0,743,Small
+Kitex Garments Ltd.,Textiles,KITEX,KITEX.NS,31209781248.0,744,Small
+Heritage Foods Ltd.,Fast Moving Consumer Goods,HERITGFOOD,HERITGFOOD.NS,30687637504.0,745,Small
+Orient Cement Ltd.,Construction Materials,ORIENTCEM,ORIENTCEM.NS,28462356480.0,746,Small
+Zaggle Prepaid Ocean Services Ltd.,Information Technology,ZAGGLE,ZAGGLE.NS,27678973952.0,747,Small
+Awfis Space Solutions Ltd.,Services,AWFIS,AWFIS.NS,21612081152.0,748,Small

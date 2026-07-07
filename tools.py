@@ -5,6 +5,8 @@ import yfinance as yf
 from cache_manager import load_sector_rs_cache
 from datetime import datetime
 from cache_manager import load_market_breadth_cache
+from config import CAP_BUCKET_MAP
+from trade_journal import log_trade_entry, log_trade_exit, get_open_positions, get_similar_past_trades
 from cache_manager import (
     load_price_cache_short, load_price_cache_long, load_delivery_cache, load_bulk_deals_cache,
     get_cache_age, load_delivery_history, load_upcoming_results, load_nifty_cache
@@ -168,6 +170,7 @@ def get_swing_levels_long(ticker):
         sector_data = load_sector_rs_cache().get(ticker, {})
     except Exception:
         sector_data = {}
+    cap_bucket = CAP_BUCKET_MAP.get(ticker, 'Unknown')
 
     return {
         'ticker': ticker, 'current_price': round(current_price, 2),
@@ -176,6 +179,7 @@ def get_swing_levels_long(ticker):
         'rsi': round(latest['rsi'], 1),
         'dist_from_52w_high_pct': round(latest['dist_from_high_252'] * 100, 1),
         'momentum_60d_pct': round(latest['momentum_60d'], 1),
+        'cap_bucket': cap_bucket,
         'near_52w_high': bool(near_high), 'in_uptrend': bool(in_uptrend),
         'validated_setup': bool(near_high and in_uptrend and outperforming_market),
         'extreme_momentum': bool(extreme_momentum),
@@ -196,6 +200,7 @@ def get_snapshot_text_long(ticker):
         news = get_news(ticker)
         text = cache_status_note()
         text += f"{ticker} Snapshot ({LONG_HORIZON_DAYS}-day horizon):\n"
+        text += f"Market Cap Segment: {levels.get('cap_bucket', 'Unknown')} (backtested edge in this segment: Small=strongest z=14.52, Mid=z=2.88, Large=weakest-but-real z=2.28)\n"
         text += f"Current Price: ₹{levels['current_price']}\n"
         text += f"RSI: {levels['rsi']}\n"
         text += f"CAUTION - Extreme/parabolic move: {'YES - verify with fundamentals' if levels['extreme_momentum'] else 'No'}\n"
@@ -228,13 +233,18 @@ def scan_watchlist_text_long(limit=30, validated_only=True):
     if len(snapshot_rows) == 0:
         return "No stocks currently match the validated long-term setup. Try validated_only=false."
 
-    df = pd.DataFrame(snapshot_rows).sort_values('momentum_60d_pct', ascending=False)
-    text = cache_status_note()
-    text += f"Long-term scan - validated setups (near 52w high + uptrend), showing up to {limit}:\n\n"
-    for _, row in df.head(limit).iterrows():
-        text += f"{row['ticker']}: Price ₹{row['current_price']}, momentum {row['momentum_60d_pct']}%, Stop ₹{row['stop_loss']}, Target ₹{row['target']}\n"
-    return text
+    df = pd.DataFrame(snapshot_rows)
 
+    bucket_priority = {'Small': 0, 'Mid': 1, 'Large': 2, 'Unknown': 3}
+    df['bucket_sort'] = df['cap_bucket'].map(bucket_priority)
+    df = df.sort_values(['bucket_sort', 'momentum_60d_pct'], ascending=[True, False])
+
+    text = cache_status_note()
+    text += (f"Long-term scan - validated setups sorted by strength: Small-cap first (backtested z=14.52, "
+             f"strongest edge), then Mid (z=2.88), then Large (z=2.28, weakest but still real), showing up to {limit}:\n\n")
+    for _, row in df.head(limit).iterrows():
+        text += f"{row['ticker']} [{row['cap_bucket']}]: Price ₹{row['current_price']}, momentum {row['momentum_60d_pct']}%, Stop ₹{row['stop_loss']}, Target ₹{row['target']}\n"
+    return text
 
 def label_debt_to_equity(value):
     if value is None:
@@ -355,6 +365,31 @@ def parse_bool(value, default=True):
         return value.strip().lower() == 'true'
     return default
 
+def scan_watchlist_text_short(limit=30, rsi_threshold=30, include_large_cap=False):
+    price_cache = load_price_cache_short()
+    snapshot_rows = []
+    for ticker in price_cache.keys():
+        bucket = CAP_BUCKET_MAP.get(ticker)
+        if bucket == 'Large' and not include_large_cap:
+            continue  # RSI<30 has no proven edge in large-caps (backtested z=1.29, not significant)
+        try:
+            levels = get_swing_levels_short(ticker)
+            if levels['rsi'] < rsi_threshold:
+                snapshot_rows.append(levels)
+        except Exception:
+            continue
+
+    if len(snapshot_rows) == 0:
+        return f"No stocks currently have RSI below {rsi_threshold} in the validated (Mid/Small cap) universe."
+
+    df = pd.DataFrame(snapshot_rows).sort_values('rsi')
+    text = cache_status_note()
+    text += f"Short-term scan - RSI < {rsi_threshold} in Mid/Small cap stocks (backtested strongest here, z-score up to 12.06), showing up to {limit}:\n\n"
+    for _, row in df.head(limit).iterrows():
+        spike_flag = " [VOLUME SPIKE]" if row['volume_spike'] else ""
+        text += f"{row['ticker']}: Price ₹{row['current_price']}, RSI {row['rsi']}, Model signal {row['model_signal_pct']}%, Stop ₹{row['stop_loss']}, Target ₹{row['target']}{spike_flag}\n"
+    return text
+
 def calculate_position_size(ticker, total_capital, risk_pct=1.0, term="short", confirmed=False):
     levels = get_swing_levels_short(ticker) if term == "short" else get_swing_levels_long(ticker)
 
@@ -396,6 +431,25 @@ def calculate_position_size(ticker, total_capital, risk_pct=1.0, term="short", c
         'target': levels['target'],
         'potential_profit_at_target': round(shares_to_buy * (levels['target'] - entry_price), 2),
     }
+
+def record_trade_entry(ticker, term, shares, capital_used, risk_pct, entry_price=None):
+    levels = get_swing_levels_short(ticker) if term == "short" else get_swing_levels_long(ticker)
+    market_regime = None
+    if term == "long":
+        try:
+            market_regime = load_market_breadth_cache().get('regime')
+        except Exception:
+            pass
+    trade_id = log_trade_entry(ticker, term, shares, capital_used, risk_pct, levels, market_regime, entry_price)
+    return f"Trade logged: {trade_id}. {ticker} entered at ₹{entry_price if entry_price else levels['current_price']}, {shares} shares."
+
+
+def record_trade_exit(ticker, exit_price):
+    result = log_trade_exit(ticker, exit_price)
+    if 'error' in result:
+        return result['error']
+    return (f"Trade closed: {ticker} - Entry ₹{result['entry_price']} → Exit ₹{result['exit_price']} "
+            f"= {result['return_pct']}% return over {result['holding_days']} days ({result['exit_type']}).")
 
 def get_full_analysis(ticker, term="short"):
     """Forces the complete checklist every time - snapshot, fundamentals, institutional, results - no inconsistency possible."""
@@ -461,6 +515,41 @@ TOOL_DEFINITIONS = [
     "parameters": {"type": "object", "properties": {}}
 }},
     {"type": "function", "function": {
+    "name": "record_trade_entry",
+    "description": "Logs a real trade entry - freezes the current signal snapshot (RSI, momentum, regime, etc.) permanently for future reference. Call this when the user says they've actually entered/bought a position.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "ticker": {"type": "string"}, "term": {"type": "string", "enum": ["short", "long"]},
+            "shares": {"type": "integer"}, "capital_used": {"type": "number"},
+            "risk_pct": {"type": "number"}, "entry_price": {"type": "number", "description": "Actual fill price if different from current market price"}
+        },
+        "required": ["ticker", "term", "shares", "capital_used", "risk_pct"]
+    }
+}},
+{"type": "function", "function": {
+    "name": "record_trade_exit",
+    "description": "Logs a real trade exit and computes the actual return. Call this when the user says they've sold/closed a position.",
+    "parameters": {"type": "object", "properties": {"ticker": {"type": "string"}, "exit_price": {"type": "number"}}, "required": ["ticker", "exit_price"]}
+}},
+{"type": "function", "function": {
+    "name": "get_open_positions",
+    "description": "Lists all currently open logged trades.",
+    "parameters": {"type": "object", "properties": {}}
+}},
+{"type": "function", "function": {
+    "name": "get_similar_past_trades",
+    "description": "Retrieves the user's own past closed trades matching a given profile (term, and for long-term, whether it was a validated setup), with honest win rate/return stats. ALWAYS includes explicit sample-size caveats - never overstate confidence from few trades. Use this before finalizing any recommendation to ground it in the user's real personal track record.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "term": {"type": "string", "enum": ["short", "long"]},
+            "validated_setup": {"type": ["boolean", "string"], "description": "Optional, long-term only - filter to only validated setups"}
+        },
+        "required": ["term"]
+    }
+}},
+    {"type": "function", "function": {
         "name": "calculate_position_size",
         "description": "Calculates shares to buy given capital and risk %. Will BLOCK and return a warning instead of sizing if risk_pct exceeds 2%, or if the stock has an extreme/parabolic move flag (long-term only) - requires confirmed=true to override after explicitly asking the user.",
         "parameters": {
@@ -488,6 +577,17 @@ def execute_tool(function_name, function_args):
     elif function_name == "scan_watchlist_text_long":
         validated_only = parse_bool(function_args.get('validated_only', True))
         return scan_watchlist_text_long(function_args.get('limit', 30), validated_only)
+    elif function_name == "record_trade_entry":
+        return record_trade_entry(function_args['ticker'], function_args['term'], function_args['shares'],
+                                    function_args['capital_used'], function_args['risk_pct'], function_args.get('entry_price'))
+    elif function_name == "record_trade_exit":
+        return record_trade_exit(function_args['ticker'], function_args['exit_price'])
+    elif function_name == "get_open_positions":
+        return get_open_positions()
+    elif function_name == "get_similar_past_trades":
+        vs = function_args.get('validated_setup')
+        vs = parse_bool(vs) if vs is not None else None
+        return get_similar_past_trades(function_args['term'], vs)
     elif function_name == "get_fundamentals_text":
         return get_fundamentals_text(function_args['ticker'])
     elif function_name == "get_institutional_activity_text":

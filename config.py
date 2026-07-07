@@ -1,11 +1,16 @@
 import pandas as pd
 
 def load_watchlist():
-    df = pd.read_csv('nse_watchlist_full.csv')
-    microcap_only = df[df['category'] == 'microcap']
-    return microcap_only['ticker'].tolist()
+    df = pd.read_csv('nse_watchlist_expanded.csv')
+    return df['ticker'].tolist()
 
 WATCHLIST = load_watchlist()
+
+def load_cap_bucket_map():
+    df = pd.read_csv('nse_watchlist_expanded.csv')
+    return dict(zip(df['ticker'], df['cap_bucket']))
+
+CAP_BUCKET_MAP = load_cap_bucket_map()
 
 # --- SHORT-TERM (4-6 day) settings - validated: RSI<30 + ATR stops, z-score 8.08 ---
 SHORT_FEATURE_COLUMNS = ['rsi', 'macd', 'macd_signal', 'sma_20', 'sma_50',

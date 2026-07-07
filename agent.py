@@ -44,7 +44,15 @@ SYSTEM_PROMPT = ("You are a trading assistant for Indian NSE stocks supporting T
 "but the broader market/Nifty isn't confirmed bullish, note that this raises the odds the move is "
 "stock-specific rather than a supported trend, which should reinforce rather than offset any existing "
 "caution flags. If the regime is supportive (bullish, high breadth), you can note that as a mild positive "
-"tailwind. Always make this connection explicit, never leave the two data points unconnected.")
+"tailwind. Always make this connection explicit, never leave the two data points unconnected."
+                   "Before finalizing any recommendation, call get_similar_past_trades for the relevant term - always relay "
+"the sample-size honesty note exactly as given, never present a small personal sample as a reliable pattern. "
+"When the user says they've entered a real trade, call record_trade_entry. When they say they've exited/sold, "
+"call record_trade_exit. Always confirm back what was logged so the user knows it was captured correctly."
+                   "For long-term scans, results are sorted with Small-cap first since backtesting showed the strongest edge "
+"there (z=14.52), but Mid and Large-cap results are still valid and shown too (z=2.88 and z=2.28 respectively - "
+"weaker but statistically real). When discussing a candidate, mention its cap segment and be honest that "
+"Large-cap picks carry a meaningfully weaker proven edge than Small-cap ones, even though both are legitimate.")
 
 MAX_TOOL_ROUNDS = 12  # safety limit so it can't loop forever
 
