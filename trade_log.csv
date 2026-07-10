@@ -1,2 +1,3 @@
 trade_id,ticker,term,entry_date,entry_price,stop_loss,target,shares,capital_used,risk_pct,rsi_at_entry,model_signal_at_entry,volume_spike_at_entry,momentum_60d_at_entry,validated_setup_at_entry,extreme_momentum_at_entry,relative_strength_nifty_at_entry,sector_relative_strength_at_entry,market_regime_at_entry,status,exit_date,exit_price,exit_type,return_pct,holding_days
 CUPID.NS_20260706165451,CUPID.NS,long,2026-07-06,213.09,196.04,247.18,25,5000,1,91.9,7.630000114440918,,127.3,True,True,121.7,117.9,Mixed/Neutral,closed,2026-07-06,215,manual_exit,0.9,0
+KPITTECH.NS_20260710092204,KPITTECH.NS,short,2026-07-10,548.15,497.07,599.23,3,1644.45,4,17.4,1.899999976158142,False,,,,,,,open,,,,,

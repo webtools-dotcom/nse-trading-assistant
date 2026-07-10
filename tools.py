@@ -365,6 +365,19 @@ def parse_bool(value, default=True):
         return value.strip().lower() == 'true'
     return default
 
+def parse_number(value, default=None):
+    """Handles cases where the model sends a number as a string like '2000' instead of a real number."""
+    if value is None:
+        return default
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, str):
+        try:
+            return float(value) if '.' in value else int(value)
+        except ValueError:
+            return default
+    return default
+
 def scan_watchlist_text_short(limit=30, rsi_threshold=30, include_large_cap=False):
     price_cache = load_price_cache_short()
     snapshot_rows = []
@@ -481,7 +494,7 @@ TOOL_DEFINITIONS = [
     {"type": "function", "function": {
         "name": "scan_watchlist_text_short",
         "description": "Scans watchlist for 4-6 day swing setups. Default RSI<30 (backtested strongest, z-score 8.08).",
-        "parameters": {"type": "object", "properties": {"limit": {"type": "integer"}, "rsi_threshold": {"type": "integer"}}}
+        "parameters": {"type": "object", "properties": {"limit": {"type": ["integer", "string"]}, "rsi_threshold": {"type": ["integer", "string"]}}}
     }},
     {"type": "function", "function": {
         "name": "scan_watchlist_text_long",
@@ -521,8 +534,8 @@ TOOL_DEFINITIONS = [
         "type": "object",
         "properties": {
             "ticker": {"type": "string"}, "term": {"type": "string", "enum": ["short", "long"]},
-            "shares": {"type": "integer"}, "capital_used": {"type": "number"},
-            "risk_pct": {"type": "number"}, "entry_price": {"type": "number", "description": "Actual fill price if different from current market price"}
+            "shares": {"type": ["integer", "string"]}, "capital_used": {"type": ["number", "string"]},
+            "risk_pct": {"type": ["number", "string"]}, "entry_price": {"type": ["number", "string"], "description": "Actual fill price if different from current market price"}
         },
         "required": ["ticker", "term", "shares", "capital_used", "risk_pct"]
     }
@@ -530,7 +543,7 @@ TOOL_DEFINITIONS = [
 {"type": "function", "function": {
     "name": "record_trade_exit",
     "description": "Logs a real trade exit and computes the actual return. Call this when the user says they've sold/closed a position.",
-    "parameters": {"type": "object", "properties": {"ticker": {"type": "string"}, "exit_price": {"type": "number"}}, "required": ["ticker", "exit_price"]}
+    "parameters": {"type": "object", "properties": {"ticker": {"type": "string"}, "exit_price": {"type": ["number", "string"]}}, "required": ["ticker", "exit_price"]}
 }},
 {"type": "function", "function": {
     "name": "get_open_positions",
@@ -551,12 +564,12 @@ TOOL_DEFINITIONS = [
 }},
     {"type": "function", "function": {
         "name": "calculate_position_size",
-        "description": "Calculates shares to buy given capital and risk %. Will BLOCK and return a warning instead of sizing if risk_pct exceeds 2%, or if the stock has an extreme/parabolic move flag (long-term only) - requires confirmed=true to override after explicitly asking the user.",
+        "description": "Calculates shares to buy given capital and risk %. Will BLOCK and return a warning instead of sizing if risk_pct exceeds 2%, or if the stock has an extreme/parabolic move flag (long-term only) - requires confirmed=true to override after explicitly asking the user. ticker is REQUIRED and must be a real stock symbol - if the user hasn't named a specific stock, scan first to find one before calling this.",
         "parameters": {
             "type": "object",
             "properties": {
-                "ticker": {"type": "string"}, "total_capital": {"type": "number"},
-                "risk_pct": {"type": "number"}, "term": {"type": "string", "enum": ["short", "long"]},
+                "ticker": {"type": "string"}, "total_capital": {"type": ["number", "string"]},
+                "risk_pct": {"type": ["number", "string"]}, "term": {"type": "string", "enum": ["short", "long"]},
                 "confirmed": {"type": ["boolean", "string"], "description": "Set to true only after the user has explicitly confirmed they want to proceed despite a warning."}
             },
             "required": ["ticker", "total_capital"]
@@ -573,15 +586,20 @@ def execute_tool(function_name, function_args):
     elif function_name == "get_full_analysis":
         return get_full_analysis(function_args['ticker'], function_args.get('term', 'short'))
     elif function_name == "scan_watchlist_text_short":
-        return scan_watchlist_text_short(function_args.get('limit', 30), function_args.get('rsi_threshold', 30))
+        limit = parse_number(function_args.get('limit', 30), default=30)
+        rsi_threshold = parse_number(function_args.get('rsi_threshold', 30), default=30)
+        return scan_watchlist_text_short(limit, rsi_threshold)
     elif function_name == "scan_watchlist_text_long":
         validated_only = parse_bool(function_args.get('validated_only', True))
         return scan_watchlist_text_long(function_args.get('limit', 30), validated_only)
     elif function_name == "record_trade_entry":
-        return record_trade_entry(function_args['ticker'], function_args['term'], function_args['shares'],
-                                    function_args['capital_used'], function_args['risk_pct'], function_args.get('entry_price'))
+        return record_trade_entry(
+            function_args['ticker'], function_args['term'],
+            parse_number(function_args['shares']), parse_number(function_args['capital_used']),
+            parse_number(function_args['risk_pct']), parse_number(function_args.get('entry_price'))
+        )
     elif function_name == "record_trade_exit":
-        return record_trade_exit(function_args['ticker'], function_args['exit_price'])
+        return record_trade_exit(function_args['ticker'], parse_number(function_args['exit_price']))
     elif function_name == "get_open_positions":
         return get_open_positions()
     elif function_name == "get_similar_past_trades":
@@ -597,8 +615,12 @@ def execute_tool(function_name, function_args):
     elif function_name == "check_upcoming_results":
         return check_upcoming_results(function_args['ticker'])
     elif function_name == "calculate_position_size":
+        ticker = function_args.get('ticker', '').strip()
+        if not ticker:
+            return "No ticker was provided. First scan for a candidate (scan_watchlist_text_short or scan_watchlist_text_long) to find a specific stock, then call this tool with that ticker."
         confirmed = parse_bool(function_args.get('confirmed', False), default=False)
-        pos = calculate_position_size(function_args['ticker'], function_args['total_capital'],
-                                        function_args.get('risk_pct', 1.0), function_args.get('term', 'short'), confirmed)
+        total_capital = parse_number(function_args.get('total_capital'))
+        risk_pct = parse_number(function_args.get('risk_pct', 1.0), default=1.0)
+        pos = calculate_position_size(ticker, total_capital, risk_pct, function_args.get('term', 'short'), confirmed)
         return json.dumps(pos, indent=2)
     return "Unknown function"

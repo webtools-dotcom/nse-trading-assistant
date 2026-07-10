@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import ta
 import pickle
 import os
+import time
 import nsefin
 
 CACHE_DIR = "cache"
@@ -198,7 +199,7 @@ def load_upcoming_results():
 
 def refresh_price_cache_short(tickers):
     print(f"Downloading SHORT-TERM price data for {len(tickers)} stocks...")
-    raw = yf.download(tickers, period="6mo", interval="1d", progress=True, auto_adjust=True, group_by='ticker')
+    raw = chunked_download(tickers, chunk_size=100, period="6mo", interval="1d", auto_adjust=True)
 
     all_features = {}
     for ticker in tickers:
@@ -353,3 +354,16 @@ def refresh_market_breadth():
 def load_market_breadth_cache():
     with open(MARKET_BREADTH_CACHE_FILE, 'rb') as f:
         return pickle.load(f)
+
+def chunked_download(tickers, chunk_size=100, **kwargs):
+    """Downloads in smaller batches to avoid Yahoo rate-limiting on very large single requests."""
+    all_chunks = []
+    for i in range(0, len(tickers), chunk_size):
+        chunk = tickers[i:i + chunk_size]
+        print(f"  Downloading batch {i // chunk_size + 1} ({len(chunk)} stocks)...")
+        chunk_df = yf.download(chunk, progress=False, group_by='ticker', **kwargs)
+        all_chunks.append(chunk_df)
+        time.sleep(2)  # brief pause between batches, reduces rate-limit risk
+
+    combined = pd.concat(all_chunks, axis=1)
+    return combined
