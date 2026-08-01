@@ -84,7 +84,10 @@ with st.sidebar:
                     st.rerun()
             with col2:
                 if st.button("🗑️", key=f"del_{c['id']}"):
-                    os.remove(os.path.join(CONV_DIR, f"{c['id']}.json"))
+                    try:
+                        os.remove(os.path.join(CONV_DIR, f"{c['id']}.json"))
+                    except FileNotFoundError:
+                        pass
                     if st.session_state.session_id == c['id']:
                         start_new_conversation()
                     st.rerun()

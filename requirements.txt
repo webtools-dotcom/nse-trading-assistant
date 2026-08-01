@@ -7,4 +7,9 @@ scikit-learn
 openai
 python-dotenv
 nselib
+nsefin
+requests
+xlrd>=2.0.1
+scipy
 streamlit
+mcp

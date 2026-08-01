@@ -1,7 +1,7 @@
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import ta
+from features import add_short_features
 
 
 def download_watchlist_history(tickers, period="5y"):
@@ -27,26 +27,9 @@ def download_watchlist_history(tickers, period="5y"):
 
 def add_features(stock_df, horizon=6):
     """Short-term feature set - validated for 4-6 day horizon (RSI<30, z-score 8.08)."""
-    stock_df = stock_df.sort_values('date').reset_index(drop=True)
-
-    stock_df['rsi'] = ta.momentum.RSIIndicator(close=stock_df['close'], window=14).rsi()
-    macd = ta.trend.MACD(close=stock_df['close'])
-    stock_df['macd'] = macd.macd()
-    stock_df['macd_signal'] = macd.macd_signal()
-    stock_df['sma_20'] = ta.trend.SMAIndicator(close=stock_df['close'], window=20).sma_indicator()
-    stock_df['sma_50'] = ta.trend.SMAIndicator(close=stock_df['close'], window=50).sma_indicator()
-    stock_df['volume_change'] = stock_df['volume'].pct_change()
-    stock_df['price_change'] = stock_df['close'].pct_change()
-    stock_df['volatility_10'] = stock_df['close'].rolling(10).std()
-    stock_df['distance_from_high_50'] = (stock_df['close'] / stock_df['close'].rolling(50).max()) - 1
-
-    atr_indicator = ta.volatility.AverageTrueRange(high=stock_df['high'], low=stock_df['low'], close=stock_df['close'], window=14)
-    stock_df['atr'] = atr_indicator.average_true_range()
-    stock_df['atr_pct'] = (stock_df['atr'] / stock_df['close']) * 100
-
+    stock_df = add_short_features(stock_df)
     stock_df['future_close'] = stock_df['close'].shift(-horizon)
     stock_df['target_pct'] = ((stock_df['future_close'] - stock_df['close']) / stock_df['close']) * 100
-
     return stock_df
 
 
@@ -71,10 +54,14 @@ def build_training_dataset(tickers, period="5y", horizon=6):
     return full_df_clean
 
 
-def get_latest_snapshot_data(ticker):
-    stock_df = yf.download(ticker, period="6mo", interval="1d", progress=False, auto_adjust=True)
-    stock_df.columns = stock_df.columns.get_level_values(0)
-    stock_df = stock_df.reset_index()
-    stock_df.columns = [str(c).lower() for c in stock_df.columns]
-    stock_df = add_features(stock_df, horizon=6)
-    return stock_df
+def get_live_price(ticker):
+    """Single, lightweight real-time quote - bypasses the daily-bar cache entirely,
+    always reflects the current live price regardless of Yahoo's daily-close finalization lag."""
+    try:
+        stock = yf.Ticker(ticker)
+        price = stock.fast_info.get('last_price')
+        if price is None:
+            price = stock.info.get('currentPrice') or stock.info.get('regularMarketPrice')
+        return price
+    except Exception:
+        return None

@@ -2,28 +2,104 @@ import json
 import pickle
 import pandas as pd
 import yfinance as yf
-from cache_manager import load_sector_rs_cache
 from datetime import datetime
-from cache_manager import load_market_breadth_cache
-from config import CAP_BUCKET_MAP
-from trade_journal import log_trade_entry, log_trade_exit, get_open_positions, get_similar_past_trades
+from data_fetcher import get_live_price
+from data_fetcher_long import get_fundamentals
+from trade_journal import (check_exit_signals, log_trade_entry, log_trade_exit, get_open_positions,
+                           get_similar_past_trades, get_strategy_health)
 from cache_manager import (
-    load_price_cache_short, load_price_cache_long, load_delivery_cache, load_bulk_deals_cache,
+    load_sector_rs_cache, load_market_breadth_cache, load_vix_cache, load_corp_announcements_cache,
+    load_price_cache_short, load_price_cache_long, load_bulk_deals_cache,
     get_cache_age, load_delivery_history, load_upcoming_results, load_nifty_cache
 )
-from data_fetcher_long import get_fundamentals
+from meta_label import score_latest
 from config import (
-    WATCHLIST, SHORT_FEATURE_COLUMNS, SHORT_MODEL_PATH, SHORT_HORIZON_DAYS,
-    LONG_FEATURE_COLUMNS, LONG_MODEL_PATH, LONG_HORIZON_DAYS, LONG_STOP_PCT, LONG_TARGET_PCT
+    CAP_BUCKET_MAP, SHORT_FEATURE_COLUMNS, SHORT_MODEL_PATH,
+    LONG_FEATURE_COLUMNS, LONG_MODEL_PATH, LONG_HORIZON_DAYS, LONG_STOP_PCT, LONG_TARGET_PCT,
+    DEFAULT_CAPITAL, DEFAULT_RISK_PCT, MAX_RISK_PCT,
+    MIN_TURNOVER_INR, GROSS_EDGE_SHORT_PCT, GROSS_EDGE_LONG_PCT, round_trip_cost_pct,
+    gross_edge_for_rsi, vol_regime_multiplier, gross_edge_for_meta, META_MIN_TRADEABLE
 )
+
+HIGH_SIGNAL_ANNOUNCEMENT_KEYWORDS = [
+    'change in management', 'appointment', 'resignation', 'takeover regulation',
+    'scheme of arrangement', 'merger', 'demerger', 'acquisition', 'amalgamation',
+    'preferential issue', 'fund raising', 'buyback', 'delisting', 'credit rating',
+    'outcome of board meeting', 'rights issue', 'qip', 'open offer'
+]
 
 
 def load_model(path):
     with open(path, 'rb') as f:
         return pickle.load(f)
 
-MODEL_SHORT = load_model(SHORT_MODEL_PATH)
-MODEL_LONG = load_model(LONG_MODEL_PATH)
+
+def fmt_pct(value):
+    """Renders a percentage value, or 'n/a' instead of the literal 'None'/'nan' when missing."""
+    if value is None or pd.isna(value):
+        return "n/a"
+    return f"{value}%"
+
+
+def liquidity_fields(latest, gross_edge_pct, p_win=None):
+    """Turnover + net-of-cost expected value for one candidate.
+
+    The gross backtested edge is NOT what you get to keep: on a 4-6 day mid/small-cap hold,
+    Indian round-trip costs plus liquidity-scaled impact are the same order of magnitude as
+    the edge itself. Surfacing net EV stops the agent quoting gross as if it were takeable.
+
+    When a meta-model score is available it DRIVES the expected value rather than merely
+    breaking ties. Measured out-of-sample, P(win) separates outcomes far more sharply than the
+    RSI band does: below ~0.50 the setup is a loser even before costs (gross -0.20%), above
+    0.60 it is +2.43%. Ranking on the RSI band and using P(win) only as a tiebreaker put a
+    36%-P(win) name at the top of a scan with a headline +0.50% EV whose true expectancy was
+    about -1.17%. The score has to be inside the number, not beside it.
+    """
+    turnover = latest.get('turnover_60d')
+    if turnover is not None and pd.isna(turnover):
+        turnover = None
+    cost = round_trip_cost_pct(turnover)
+
+    meta_edge = gross_edge_for_meta(p_win)
+    gross = meta_edge if meta_edge is not None else gross_edge_pct
+    return {
+        'turnover_60d_cr': round(turnover / 1e7, 1) if turnover is not None else None,
+        'round_trip_cost_pct': round(cost, 2),
+        'gross_edge_pct': round(gross, 2),
+        'ev_source': 'meta-model P(win)' if meta_edge is not None else 'RSI band (no meta score)',
+        'net_ev_pct': round(gross - cost, 2),
+        'illiquid': turnover is None or turnover < MIN_TURNOVER_INR,
+        'below_meta_floor': p_win is not None and p_win == p_win and p_win < META_MIN_TRADEABLE,
+    }
+
+def ev_block(levels):
+    """The decision-relevant numbers, rendered identically wherever a candidate is shown.
+
+    Single source of truth on purpose: the scan had these and the snapshot did not, so asking
+    for a scan and asking for a full analysis of the same stock gave different pictures - the
+    snapshot showed only the dead XGBoost signal and hid the fact that expectancy was negative.
+    """
+    turn = f"₹{levels['turnover_60d_cr']}cr/day" if levels.get('turnover_60d_cr') is not None else "n/a"
+    mp = levels.get('meta_win_prob')
+    if mp is not None and pd.notna(mp):
+        flag = "  ⚠️ BELOW TRADEABLE FLOOR - measured edge is NEGATIVE here" if mp < META_MIN_TRADEABLE else ""
+        meta = f"P(win): {mp*100:.0f}%{flag}\n"
+    else:
+        meta = "P(win): unavailable (NO OPINION - this is not a low score)\n"
+    return (f"Liquidity: {turn} | round-trip cost {levels['round_trip_cost_pct']}%\n"
+            f"{meta}"
+            f"NET EXPECTED VALUE: {levels['net_ev_pct']:+.2f}%/trade "
+            f"(gross {levels['gross_edge_pct']:+.2f}% from {levels['ev_source']}, minus costs)\n")
+
+
+try:
+    MODEL_SHORT = load_model(SHORT_MODEL_PATH)
+except Exception:
+    MODEL_SHORT = None
+try:
+    MODEL_LONG = load_model(LONG_MODEL_PATH)
+except Exception:
+    MODEL_LONG = None
 
 
 def cache_status_note():
@@ -72,8 +148,19 @@ def get_swing_levels_short(ticker):
     target_2 = current_price + (3.5 * atr)
 
     X_live = stock_df[SHORT_FEATURE_COLUMNS].iloc[[-1]]
-    predicted_move = MODEL_SHORT.predict(X_live)[0]
+    predicted_move = MODEL_SHORT.predict(X_live)[0] if MODEL_SHORT is not None else None
+    _p_win = score_latest(stock_df)
     volume_spike = latest.get('volume_change', 0) > 0.5
+   
+    change_1yr = latest.get('change_252d')
+    if change_1yr is None or pd.isna(change_1yr):
+        trend_tier = 'Unknown'
+    elif change_1yr > 20:
+        trend_tier = 'Uptrend'
+    elif change_1yr < -20:
+        trend_tier = 'Downtrend'
+    else:
+        trend_tier = 'Flat/Mild'    
 
     return {
         'ticker': ticker, 'current_price': round(current_price, 2),
@@ -82,7 +169,20 @@ def get_swing_levels_short(ticker):
         'target_2': round(target_2, 2),
         'support_20d': round(support, 2), 'resistance_20d': round(resistance, 2),
         'rsi': round(latest['rsi'], 1), 'volume_spike': bool(volume_spike),
-        'model_signal_pct': round(predicted_move, 2),
+        'change_1yr_pct': round(change_1yr, 1) if change_1yr is not None and not pd.isna(change_1yr) else None,
+        'trend_tier': trend_tier,
+        'cap_bucket': CAP_BUCKET_MAP.get(ticker, 'Unknown'),
+        # Day-clustered testing (2026-08) left these two strata no longer distinguishable from
+        # random entry. Their net EV is still computed from the RSI-depth/meta edge, which does
+        # NOT know that, so the number would read as more validated than it is without this flag.
+        'tier_unvalidated': trend_tier == 'Downtrend',
+        'cap_unvalidated': CAP_BUCKET_MAP.get(ticker) == 'Mid',
+        'model_signal_pct': round(float(predicted_move), 2) if predicted_move is not None else None,
+        # P(profitable | signal fired). Replaces the R2~0 return-predictor with a question that
+        # is actually learnable, and it now drives expected value directly.
+        'meta_win_prob': _p_win,
+        # falls back to the RSI-band edge only when no meta score is available
+        **liquidity_fields(latest, gross_edge_for_rsi(latest['rsi']), p_win=_p_win),
     }
 
 
@@ -95,44 +195,22 @@ def get_snapshot_text_short(ticker):
         text += f"Current Price: ₹{levels['current_price']}\n"
         text += f"RSI: {levels['rsi']}\n"
         text += f"Volume spike: {'YES' if levels['volume_spike'] else 'No'}\n"
-        text += f"Model signal (weak): {levels['model_signal_pct']}%\n"
+        text += ev_block(levels)
+        text += f"Model signal (weak, IGNORE): {levels['model_signal_pct']}% - old XGBoost, R-squared near zero\n"
         text += f"Stop Loss: ₹{levels['stop_loss']}\n"
         text += f"Target 1: ₹{levels['target']}\n"
         text += f"Target 2: ₹{levels['target_2']}\n"
         text += f"Support: ₹{levels['support_20d']}\n"
+        text += (f"1-Year Trend: {levels.get('trend_tier')} ({levels.get('change_1yr_pct')}%) - day-clustered "
+                 f"edge vs same-day random control: Flat/Mild z 4.41 (most reliable), Uptrend z 2.05 "
+                 f"(highest return +1.23%/trade, fewer days so less certain), "
+                 f"Downtrend z 0.71 (NOT distinguishable from random - tier no longer validated)\n")
         text += f"Resistance: ₹{levels['resistance_20d']}\n"
         text += f"Recent news: {'; '.join(news)}\n"
         return text
     except Exception as e:
         return f"Error fetching data for {ticker}: {e}"
 
-
-def scan_watchlist_text_short(limit=30, rsi_threshold=30, filter_earnings_decline=True):
-    price_cache = load_price_cache_short()
-    snapshot_rows = []
-    for ticker in price_cache.keys():
-        try:
-            levels = get_swing_levels_short(ticker)
-            if levels['rsi'] < rsi_threshold:
-                if filter_earnings_decline:
-                    fund = get_fundamentals(ticker)
-                    earnings_growth = fund.get('earnings_growth_pct')
-                    if earnings_growth is not None and earnings_growth < -20:
-                        continue  # skip likely "falling knife" stocks - unvalidated filter, added post-CMSINFO
-                snapshot_rows.append(levels)
-        except Exception:
-            continue
-
-    if len(snapshot_rows) == 0:
-        return f"No stocks currently qualify (RSI < {rsi_threshold}, no severe earnings decline). This can happen - not every day has a good setup."
-
-    df = pd.DataFrame(snapshot_rows).sort_values('rsi')
-    text = cache_status_note()
-    text += f"Short-term scan - RSI < {rsi_threshold} (backtested signal, z-score 8.08), showing up to {limit}:\n\n"
-    for _, row in df.head(limit).iterrows():
-        spike_flag = " [VOLUME SPIKE]" if row['volume_spike'] else ""
-        text += f"{row['ticker']}: Price ₹{row['current_price']}, RSI {row['rsi']}, Model signal {row['model_signal_pct']}%, Stop ₹{row['stop_loss']}, Target ₹{row['target']}{spike_flag}\n"
-    return text
 
 
 # ============= LONG-TERM (1 month) =============
@@ -155,7 +233,7 @@ def get_swing_levels_long(ticker):
     resistance = stock_df['high'].tail(60).max()
 
     X_live = stock_df[LONG_FEATURE_COLUMNS].iloc[[-1]]
-    predicted_move = MODEL_LONG.predict(X_live)[0]
+    predicted_move = MODEL_LONG.predict(X_live)[0] if MODEL_LONG is not None else None
 
     near_high = latest['dist_from_high_252'] > -0.10
     in_uptrend = current_price > latest['sma_50'] > latest['sma_200']
@@ -163,6 +241,8 @@ def get_swing_levels_long(ticker):
     
     nifty_df = load_nifty_cache()
     nifty_momentum = nifty_df['momentum_60d'].iloc[-1]
+    if pd.isna(nifty_momentum):
+        raise ValueError("Nifty momentum_60d is NaN - Nifty cache is stale or too short, run refresh_cache.py")
     stock_momentum = latest['momentum_60d']
     relative_strength = stock_momentum - nifty_momentum
     outperforming_market = relative_strength > 0
@@ -183,7 +263,7 @@ def get_swing_levels_long(ticker):
         'near_52w_high': bool(near_high), 'in_uptrend': bool(in_uptrend),
         'validated_setup': bool(near_high and in_uptrend and outperforming_market),
         'extreme_momentum': bool(extreme_momentum),
-        'model_signal_pct': round(predicted_move, 2),
+        'model_signal_pct': round(float(predicted_move), 2) if predicted_move is not None else None,
         'nifty_momentum_60d_pct': round(nifty_momentum, 1),
         'relative_strength_pct': round(relative_strength, 1),
         'outperforming_market': bool(outperforming_market),
@@ -191,6 +271,7 @@ def get_swing_levels_long(ticker):
         'sector_avg_momentum_60d': sector_data.get('sector_avg_momentum_60d'),
         'sector_relative_strength': sector_data.get('sector_relative_strength'),
         'outperforming_sector': sector_data.get('outperforming_sector'),
+        **liquidity_fields(latest, GROSS_EDGE_LONG_PCT),
     }
 
 
@@ -200,50 +281,82 @@ def get_snapshot_text_long(ticker):
         news = get_news(ticker)
         text = cache_status_note()
         text += f"{ticker} Snapshot ({LONG_HORIZON_DAYS}-day horizon):\n"
-        text += f"Market Cap Segment: {levels.get('cap_bucket', 'Unknown')} (backtested edge in this segment: Small=strongest z=14.52, Mid=z=2.88, Large=weakest-but-real z=2.28)\n"
+        text += (f"Market Cap Segment: {levels.get('cap_bucket', 'Unknown')} - published z-scores (Small 14.52, "
+                 f"Mid 2.88, Large 2.28) used OVERLAPPING trades; deflated by the measured 1.70x they become "
+                 f"Small ~8.5 (holds), Mid ~1.7 and Large ~1.3 (NOT significant, treat as unvalidated)\n")
         text += f"Current Price: ₹{levels['current_price']}\n"
         text += f"RSI: {levels['rsi']}\n"
         text += f"CAUTION - Extreme/parabolic move: {'YES - verify with fundamentals' if levels['extreme_momentum'] else 'No'}\n"
         text += f"Distance from 52-week high: {levels['dist_from_52w_high_pct']}%\n"
         text += f"60-day momentum: {levels['momentum_60d_pct']}%\n"
-        text += f"Validated setup (near high + uptrend, z-score 9.69): {'YES' if levels['validated_setup'] else 'No'}\n"
-        text += f"Model signal (weak): {levels['model_signal_pct']}%\n"
+        text += (f"Validated setup (near high + uptrend): {'YES' if levels['validated_setup'] else 'No'} "
+                 f"- NOTE the published z=9.69 was computed with overlapping trades and has NOT yet been "
+                 f"re-run through the corrected engine; treat it as provisional\n")
+        text += ev_block(levels)
+        text += f"Model signal (weak, IGNORE): {levels['model_signal_pct']}% - old XGBoost, R-squared near zero\n"
         text += f"Stop Loss (-{LONG_STOP_PCT*100:.0f}%): ₹{levels['stop_loss']}\n"
         text += f"Target (+{LONG_TARGET_PCT*100:.0f}%): ₹{levels['target']}\n"
         text += f"60-day Support: ₹{levels['support_60d']}\n"
         text += f"60-day Resistance: ₹{levels['resistance_60d']}\n"
         text += f"Recent news: {'; '.join(news)}\n"
         text += f"Relative Strength vs Nifty: {levels['relative_strength_pct']}% ({'outperforming' if levels['outperforming_market'] else 'underperforming'} the broader market)\n"
-        text += f"Industry: {levels.get('industry', 'Unknown')} | Sector avg 60d momentum: {levels.get('sector_avg_momentum_60d')}% | This stock vs sector: {levels.get('sector_relative_strength')}% ({'outperforming peers' if levels.get('outperforming_sector') else 'in line with or behind peers'})\n"
+        text += f"Industry: {levels.get('industry', 'Unknown')} | Sector avg 60d momentum: {fmt_pct(levels.get('sector_avg_momentum_60d'))} | This stock vs sector: {fmt_pct(levels.get('sector_relative_strength'))} ({'outperforming peers' if levels.get('outperforming_sector') else 'in line with or behind peers'})\n"
         return text
     except Exception as e:
         return f"Error fetching data for {ticker}: {e}"
 
 def scan_watchlist_text_long(limit=30, validated_only=True):
     price_cache = load_price_cache_long()
+    has_turnover = cache_has_turnover(price_cache)
     snapshot_rows = []
+    failures = 0
+    excluded_illiquid = 0
     for ticker in price_cache.keys():
         try:
             levels = get_swing_levels_long(ticker)
-            if not validated_only or levels['validated_setup']:
-                snapshot_rows.append(levels)
+            if validated_only and not levels['validated_setup']:
+                continue
+            if has_turnover and levels['illiquid']:
+                excluded_illiquid += 1
+                continue
+            snapshot_rows.append(levels)
         except Exception:
+            failures += 1
             continue
 
     if len(snapshot_rows) == 0:
-        return "No stocks currently match the validated long-term setup. Try validated_only=false."
+        if failures == len(price_cache):
+            return "Scan failed for every stock in the cache - the price cache or Nifty cache is likely missing or corrupt. Run refresh_cache.py."
+        return f"No stocks currently match the validated long-term setup (plus {excluded_illiquid} excluded as too illiquid). Try validated_only=false."
 
     df = pd.DataFrame(snapshot_rows)
 
+    # Sort by NET expected value first, same as the short scan. Cap bucket was the old primary
+    # key, but after overlap correction only the Small-cap claim survives - ranking Mid above
+    # Large implied a distinction the corrected numbers no longer support.
     bucket_priority = {'Small': 0, 'Mid': 1, 'Large': 2, 'Unknown': 3}
     df['bucket_sort'] = df['cap_bucket'].map(bucket_priority)
-    df = df.sort_values(['bucket_sort', 'momentum_60d_pct'], ascending=[True, False])
+    df = df.sort_values(['net_ev_pct', 'bucket_sort', 'momentum_60d_pct'], ascending=[False, True, False])
 
     text = cache_status_note()
-    text += (f"Long-term scan - validated setups sorted by strength: Small-cap first (backtested z=14.52, "
-             f"strongest edge), then Mid (z=2.88), then Large (z=2.28, weakest but still real), showing up to {limit}:\n\n")
+    if not has_turnover:
+        text += "NOTE: cache predates the liquidity filter - run refresh_cache.py to enable it. Costs below assume worst-case impact.\n"
+    text += (f"Long-term scan - sorted by NET expected value after costs, showing up to {limit}.\n"
+             f"⚠️ CAP-TIER CAVEAT: the published z-scores (Small 14.52, Mid 2.88, Large 2.28) were computed with "
+             f"OVERLAPPING trades. Deflating by the measured 1.70x inflation gives Small ~8.5 (holds), Mid ~1.7 and "
+             f"Large ~1.3 (NOT significant). Treat Mid- and Large-cap long-term setups as UNVALIDATED until "
+             f"re-tested; only the Small-cap claim survives correction.\n\n")
     for _, row in df.head(limit).iterrows():
-        text += f"{row['ticker']} [{row['cap_bucket']}]: Price ₹{row['current_price']}, momentum {row['momentum_60d_pct']}%, Stop ₹{row['stop_loss']}, Target ₹{row['target']}\n"
+        turn = f"{row['turnover_60d_cr']}cr/day" if row['turnover_60d_cr'] is not None else "turnover n/a"
+        text += (f"{row['ticker']} [{row['cap_bucket']}]: Price ₹{row['current_price']}, momentum {row['momentum_60d_pct']}%, "
+                 f"Stop ₹{row['stop_loss']}, Target ₹{row['target']}\n"
+                 f"    liquidity {turn} | round-trip cost {row['round_trip_cost_pct']}% | "
+                 f"NET expected value {row['net_ev_pct']:+.2f}%/trade\n")
+    if excluded_illiquid:
+        text += (f"\n{excluded_illiquid} candidate(s) excluded: daily turnover below ₹{MIN_TURNOVER_INR/1e7:.0f}cr, where "
+                 f"impact costs likely exceed the measured edge. UNVALIDATED cost guard, not a backtested rule.\n")
+    text += ("\nNET expected value = estimated gross edge minus Indian round-trip costs. The long-term gross edge "
+             "has NOT yet been re-validated with the corrected engine - treat it as provisional and say so.\n")
     return text
 
 def label_debt_to_equity(value):
@@ -308,11 +421,14 @@ def get_institutional_activity_text(ticker):
         history = load_delivery_history()
         match = history[history['SYMBOL'].str.strip() == symbol].copy()
         match['DELIV_PER'] = pd.to_numeric(match['DELIV_PER'], errors='coerce')
-        if len(match) > 0:
+        if len(match) > 0 and match['DELIV_PER'].notna().any():
             avg_delivery = match['DELIV_PER'].mean()
             latest_delivery = match.sort_values('DATE_FETCHED').iloc[-1]['DELIV_PER']
-            trend = "above average" if latest_delivery > avg_delivery else "below average"
-            text += f"Delivery %: {latest_delivery:.2f}% latest, {avg_delivery:.2f}% avg over last {len(match)} trading days ({trend})\n\n"
+            if pd.notna(latest_delivery):
+                trend = "above average" if latest_delivery > avg_delivery else "below average"
+                text += f"Delivery %: {latest_delivery:.2f}% latest, {avg_delivery:.2f}% avg over last {len(match)} trading days ({trend})\n\n"
+            else:
+                text += "Delivery %: latest value unavailable.\n\n"
         else:
             text += f"No delivery history found for {symbol}.\n\n"
     except Exception as e:
@@ -331,17 +447,35 @@ def get_institutional_activity_text(ticker):
     return text
 
 def get_market_regime_text():
-    """Global market context - not stock-specific. Tells you whether the overall market backdrop currently supports new long exposure."""
     try:
         breadth = load_market_breadth_cache()
         text = f"Market Regime: {breadth['regime']}\n"
-        text += f"Breadth: {breadth['breadth_pct_above_200sma']}% of watchlist stocks are above their 200-day average (checked {breadth['stocks_checked']} stocks)\n"
+        text += f"Breadth: {breadth['breadth_pct_above_200sma']}% of watchlist stocks are above their 200-day average\n"
         text += f"Nifty above its own 200-day average: {'Yes' if breadth['nifty_above_200sma'] else 'No'}\n"
+
+        try:
+            vix_df = load_vix_cache()
+            latest_vix = vix_df['close'].iloc[-1]
+            avg_vix_20d = vix_df['close'].tail(20).mean()
+            if latest_vix < 15:
+                vix_read = "Low - market is calm/complacent"
+            elif latest_vix < 20:
+                vix_read = "Normal range"
+            elif latest_vix < 30:
+                vix_read = "Elevated - increased caution/uncertainty priced in"
+            else:
+                vix_read = "High - significant fear/volatility in the market"
+            text += f"India VIX: {latest_vix:.1f} ({vix_read}), 20-day avg: {avg_vix_20d:.1f}\n"
+            text += "(VIX context is informational only - not independently backtested, unlike the core validated strategies)\n"
+        except Exception:
+            text += "India VIX data unavailable.\n"
+
         if breadth['regime'] == "Broadly Bearish":
             text += "CAUTION: Broad market conditions are weak - momentum/breakout setups are statistically less reliable in this environment.\n"
         return text
     except Exception as e:
         return f"Market regime data unavailable: {e}"
+
 
 def check_upcoming_results(ticker):
     symbol = ticker.replace(".NS", "")
@@ -357,6 +491,31 @@ def check_upcoming_results(ticker):
     except Exception as e:
         return f"Upcoming results data unavailable: {e}"
 
+# Measured over 5y on the Mid/Small >=Rs25cr universe: mean net return per trade, split by how
+# many candidates fired the same day. Random entries show the SAME gradient (+1.27%/trade on
+# 21+ days), so this describes market conditions, not signal quality - the wording below must
+# not let it read as "the setup is better today".
+_COUNT_BANDS = [
+    (2,  "-0.37%", "very thin - the market is calm and these have historically been LOSING days"),
+    (5,  "-0.77%", "thin - historically the worst band"),
+    (10, "-0.18%", "moderate - historically around break-even"),
+    (20, "+0.89%", "broad selloff - historically profitable"),
+    (10 ** 9, "+2.34%", "market-wide capitulation - historically the most profitable days"),
+]
+
+
+def candidate_count_note(n):
+    """Reports how many names triggered today. Free context, and the strongest single predictor
+    of absolute return measured on this universe - but it is mostly market beta, so it is
+    labelled as conditions rather than as setup quality."""
+    hist, label = next((h, l) for cut, h, l in _COUNT_BANDS if n <= cut)
+    return (f"MARKET CONDITIONS: {n} candidate(s) passed the filter today - {label}.\n"
+            f"  Historical mean {hist}/trade on days with this many candidates (5y, net of costs).\n"
+            f"  This reflects the MARKET, not the quality of the setups below: random entries show "
+            f"the same pattern (+1.27%/trade on 21+ candidate days), so roughly half of it is simply "
+            f"how much the market bounces. Not a validated entry rule - context only.\n\n")
+
+
 def parse_bool(value, default=True):
     """Handles cases where the model sends 'True'/'true'/'false' as a string instead of a real boolean."""
     if isinstance(value, bool):
@@ -366,8 +525,11 @@ def parse_bool(value, default=True):
     return default
 
 def parse_number(value, default=None):
-    """Handles cases where the model sends a number as a string like '2000' instead of a real number."""
+    """Handles cases where the model sends a number as a string like '2000', or even
+    nested/wrapped in a dict like {'limit': 10}, instead of a plain number."""
     if value is None:
+        return default
+    if isinstance(value, bool):
         return default
     if isinstance(value, (int, float)):
         return value
@@ -376,34 +538,120 @@ def parse_number(value, default=None):
             return float(value) if '.' in value else int(value)
         except ValueError:
             return default
+    if isinstance(value, dict):
+        for v in value.values():
+            result = parse_number(v, default=None)
+            if result is not None:
+                return result
+        return default
     return default
 
-def scan_watchlist_text_short(limit=30, rsi_threshold=30, include_large_cap=False):
+def cache_has_turnover(price_cache):
+    """Stale caches predate turnover_60d. Filtering on a missing column would silently
+    reject the entire universe, so callers skip the liquidity filter instead."""
+    for df in price_cache.values():
+        return 'turnover_60d' in df.columns
+    return False
+
+
+def scan_watchlist_text_short(limit=30, rsi_threshold=30):
     price_cache = load_price_cache_short()
+    has_turnover = cache_has_turnover(price_cache)
     snapshot_rows = []
+    failures = 0
+    excluded_illiquid = 0
     for ticker in price_cache.keys():
         bucket = CAP_BUCKET_MAP.get(ticker)
-        if bucket == 'Large' and not include_large_cap:
+        if bucket == 'Large':
             continue  # RSI<30 has no proven edge in large-caps (backtested z=1.29, not significant)
         try:
             levels = get_swing_levels_short(ticker)
-            if levels['rsi'] < rsi_threshold:
-                snapshot_rows.append(levels)
+            if levels['rsi'] >= rsi_threshold:
+                continue
+            if has_turnover and levels['illiquid']:
+                excluded_illiquid += 1
+                continue
+            snapshot_rows.append(levels)
         except Exception:
+            failures += 1
             continue
 
     if len(snapshot_rows) == 0:
-        return f"No stocks currently have RSI below {rsi_threshold} in the validated (Mid/Small cap) universe."
+        if failures == len(price_cache):
+            return "Scan failed for every stock in the cache - the price cache is likely missing or corrupt. Run refresh_cache.py."
+        return f"No stocks currently have RSI below {rsi_threshold} in the validated (Mid/Small cap) universe (plus {excluded_illiquid} excluded as too illiquid to trade net of costs)."
 
-    df = pd.DataFrame(snapshot_rows).sort_values('rsi')
+    df = pd.DataFrame(snapshot_rows)
+    tier_priority = {'Uptrend': 0, 'Flat/Mild': 1, 'Downtrend': 2, 'Unknown': 3}
+    df['tier_sort'] = df['trend_tier'].map(tier_priority)
+    # Sort by NET expected value, then meta win-probability, then trend tier. Ranking on raw
+    # RSI ignored the cost difference between names, the fact that edge scales with oversold
+    # depth, and everything the meta-model knows about setup quality.
+    df['meta_sort'] = df['meta_win_prob'].fillna(-1)
+    df = df.sort_values(['net_ev_pct', 'meta_sort', 'tier_sort'], ascending=[False, False, True])
+
     text = cache_status_note()
-    text += f"Short-term scan - RSI < {rsi_threshold} in Mid/Small cap stocks (backtested strongest here, z-score up to 12.06), showing up to {limit}:\n\n"
+    if not has_turnover:
+        text += "NOTE: cache predates the liquidity filter - run refresh_cache.py to enable it. Costs below assume worst-case impact.\n"
+    text += candidate_count_note(len(df))
+    text += (f"Short-term scan - RSI < {rsi_threshold}, sorted by NET expected value after costs, showing up to {limit}.\n"
+             f"Edge scales with oversold depth (5y walk-forward, net of costs, at/above the liquidity floor):\n"
+             f"  RSI<24 +1.17%/trade | 24-26 +0.77% | 26-28 +0.50% | 28-30 +0.27% | 30-35 +0.10% (barely clears costs)\n"
+             f"Trend tier is shown but is not the primary sort. Day-clustered vs same-day random control: "
+             f"Flat/Mild z 4.41 (most reliable) | Uptrend z 2.05 (highest return/trade, fewer days) | "
+             f"Downtrend z 0.71 - NOT distinguishable from random, that tier is no longer validated.\n"
+             f"Cap tier: Small-cap holds (z 2.74); Mid-cap is no longer demonstrated (z 1.73) - partly a "
+             f"power limit, not proof it loses.\n\n")
     for _, row in df.head(limit).iterrows():
         spike_flag = " [VOLUME SPIKE]" if row['volume_spike'] else ""
-        text += f"{row['ticker']}: Price ₹{row['current_price']}, RSI {row['rsi']}, Model signal {row['model_signal_pct']}%, Stop ₹{row['stop_loss']}, Target ₹{row['target']}{spike_flag}\n"
+        turn = f"{row['turnover_60d_cr']}cr/day" if row['turnover_60d_cr'] is not None else "turnover n/a"
+        mp = row['meta_win_prob']
+        if mp is not None and pd.notna(mp):
+            flag = "  ⚠️ BELOW TRADEABLE FLOOR" if mp < META_MIN_TRADEABLE else ""
+            meta = f" | P(win) {mp*100:.0f}%{flag}"
+        else:
+            meta = " | P(win) unavailable (no opinion - NOT a low score)"
+        unvalidated = []
+        if row.get('tier_unvalidated'):
+            unvalidated.append("Downtrend tier")
+        if row.get('cap_unvalidated'):
+            unvalidated.append("Mid-cap")
+        unval_flag = (f"\n    ⚠️ {' + '.join(unvalidated)}: not distinguishable from random entry once "
+                      f"day-clustered - the NET EV above does not account for this.") if unvalidated else ""
+        text += (f"{row['ticker']} [{row['cap_bucket']}, {row['trend_tier']}, {row['change_1yr_pct']}% 1yr]: "
+                 f"Price ₹{row['current_price']}, "
+                 f"RSI {row['rsi']}, Stop ₹{row['stop_loss']}, Target ₹{row['target']}{spike_flag}{unval_flag}\n"
+                 f"    liquidity {turn} | round-trip cost {row['round_trip_cost_pct']}% | "
+                 f"NET expected value {row['net_ev_pct']:+.2f}%/trade{meta}\n")
+    if excluded_illiquid:
+        text += (f"\n{excluded_illiquid} candidate(s) excluded: daily turnover below ₹{MIN_TURNOVER_INR/1e7:.0f}cr, where "
+                 f"impact costs exceed the measured edge. VALIDATED: 5-fold walk-forward, beat the unfiltered "
+                 f"universe in all 5 folds (+0.564% vs +0.259% net/trade).\n")
+    tradeable = df[(df['net_ev_pct'] > 0) & (~df['below_meta_floor'])]
+    if len(tradeable) == 0:
+        text += ("\n⚠️ NOTHING TRADEABLE TODAY: every candidate above has either a negative net expected "
+                 "value or a P(win) below the 0.50 floor where the measured edge is negative before costs. "
+                 "The correct action is to take no trade, not to pick the least-bad name.\n")
+
+    text += ("\nNET expected value = gross edge minus Indian round-trip costs (STT, brokerage, fees, GST, "
+             "stamp duty, slippage, liquidity-scaled impact). The gross edge comes from the meta-model P(win) "
+             "where available (a sharper out-of-sample discriminator), otherwise from the RSI band. Quote the "
+             "NET figure, never the gross. NOTE: the most recent 12-month fold was negative across every "
+             "configuration tested.\n")
     return text
 
-def calculate_position_size(ticker, total_capital, risk_pct=1.0, term="short", confirmed=False):
+def calculate_position_size(ticker, total_capital, risk_pct=DEFAULT_RISK_PCT, term="short", confirmed=False):
+    ticker = (ticker or '').strip()
+    if not ticker:
+        return {'error': "No ticker was provided. First scan for a candidate, then call this tool with that ticker."}
+
+    if total_capital is None:
+        total_capital = DEFAULT_CAPITAL
+    if risk_pct is None:
+        risk_pct = DEFAULT_RISK_PCT
+    if total_capital <= 0:
+        return {'error': f"total_capital must be positive, got {total_capital}."}
+
     levels = get_swing_levels_short(ticker) if term == "short" else get_swing_levels_long(ticker)
 
     if term == "long" and levels.get('extreme_momentum') and not confirmed:
@@ -415,19 +663,54 @@ def calculate_position_size(ticker, total_capital, risk_pct=1.0, term="short", c
                        f"If they confirm, call this tool again with confirmed=true.")
         }
 
-    if risk_pct > 2.0 and not confirmed:
+    # A setup below the meta floor has a NEGATIVE measured edge before costs. Sizing it without
+    # comment would let the tool hand over a share count for a trade the data says loses money.
+    if levels.get('below_meta_floor') and not confirmed:
         return {
             'blocked': True,
-            'reason': (f"Requested risk_pct={risk_pct}% exceeds the standard maximum of 2% per trade "
+            'reason': (f"{ticker} has P(win) {levels['meta_win_prob']*100:.0f}%, below the 50% floor. "
+                       f"Out-of-sample, setups in this band average {levels['net_ev_pct']:+.2f}%/trade "
+                       f"NET - a losing trade on average, not merely a weak one. Position sizing was NOT "
+                       f"calculated. Show the user this number and ask whether they still want to proceed. "
+                       f"If they confirm, call again with confirmed=true.")
+        }
+
+    if risk_pct > MAX_RISK_PCT and not confirmed:
+        return {
+            'blocked': True,
+            'reason': (f"Requested risk_pct={risk_pct}% exceeds the standard maximum of {MAX_RISK_PCT}% per trade "
                        f"(normal range is 0.5-2%). Position sizing was NOT calculated. "
                        f"Explicitly ask the user to confirm this risk level before proceeding. "
                        f"If they confirm, call this tool again with confirmed=true.")
         }
 
-    entry_price = levels['current_price']
+    # Market-volatility regime scaling. Only applies to short-term mean reversion, where the
+    # regime dependence was measured; the long-term momentum signal was not tested for this.
+    vol_note, vol_mult = None, 1.0
+    if term == "short":
+        try:
+            vp = load_market_breadth_cache().get('market_vol_percentile')
+            vol_mult, vol_note = vol_regime_multiplier(vp)
+            if vp is not None:
+                vol_note = f"market vol at {vp*100:.0f}th percentile of its trailing year - {vol_note}"
+        except Exception as e:
+            vol_note = f"market volatility regime unavailable ({e}) - no adjustment applied"
+    effective_risk_pct = risk_pct * vol_mult
+
+    live_price = get_live_price(ticker)
+    entry_price = live_price if live_price is not None else levels['current_price']
+    price_source_note = "live quote" if live_price is not None else "cached price (live fetch failed)"
     stop_loss = levels['stop_loss']
-    risk_amount = total_capital * (risk_pct / 100)
+    if entry_price <= 0:
+        return {'error': f"{ticker}: entry price is {entry_price}, cannot size a position."}
+    risk_amount = total_capital * (effective_risk_pct / 100)
     risk_per_share = entry_price - stop_loss
+    if risk_per_share <= 0:
+        return {
+            'blocked': True,
+            'reason': (f"{ticker}'s live price (₹{entry_price}) is already at or below its stop-loss (₹{stop_loss}). "
+                       f"Position sizing was NOT calculated - this setup is no longer valid at the current price.")
+        }
     shares_by_risk = int(risk_amount / risk_per_share)
     shares_by_capital = int(total_capital / entry_price)
     shares_to_buy = min(shares_by_risk, shares_by_capital)
@@ -436,25 +719,31 @@ def calculate_position_size(ticker, total_capital, risk_pct=1.0, term="short", c
 
     return {
         'ticker': ticker, 'term': term, 'entry_price': entry_price, 'stop_loss': stop_loss,
-        'risk_per_share': round(risk_per_share, 2), 'total_capital': total_capital, 'risk_pct': risk_pct,
+        'risk_per_share': round(risk_per_share, 2), 'total_capital': total_capital,
+        'risk_pct_requested': risk_pct,
+        'risk_pct_after_regime_scaling': round(effective_risk_pct, 3),
+        'vol_regime_multiplier': vol_mult, 'vol_regime_note': vol_note,
         'shares_to_buy': shares_to_buy, 'position_value': round(position_value, 2),
         'position_pct_of_capital': round((position_value / total_capital) * 100, 2),
         'actual_risk_amount': round(actual_risk_amount, 2),
         'actual_risk_pct': round((actual_risk_amount / total_capital) * 100, 2),
         'target': levels['target'],
         'potential_profit_at_target': round(shares_to_buy * (levels['target'] - entry_price), 2),
+        'price_source': price_source_note,
     }
+
 
 def record_trade_entry(ticker, term, shares, capital_used, risk_pct, entry_price=None):
     levels = get_swing_levels_short(ticker) if term == "short" else get_swing_levels_long(ticker)
     market_regime = None
+    regime_note = ""
     if term == "long":
         try:
             market_regime = load_market_breadth_cache().get('regime')
-        except Exception:
-            pass
+        except Exception as e:
+            regime_note = f" (market regime not recorded: {e})"
     trade_id = log_trade_entry(ticker, term, shares, capital_used, risk_pct, levels, market_regime, entry_price)
-    return f"Trade logged: {trade_id}. {ticker} entered at ₹{entry_price if entry_price else levels['current_price']}, {shares} shares."
+    return f"Trade logged: {trade_id}. {ticker} entered at ₹{entry_price if entry_price else levels['current_price']}, {shares} shares.{regime_note}"
 
 
 def record_trade_exit(ticker, exit_price):
@@ -465,7 +754,6 @@ def record_trade_exit(ticker, exit_price):
             f"= {result['return_pct']}% return over {result['holding_days']} days ({result['exit_type']}).")
 
 def get_full_analysis(ticker, term="short"):
-    """Forces the complete checklist every time - snapshot, fundamentals, institutional, results - no inconsistency possible."""
     parts = []
     if term == "long":
         parts.append(get_market_regime_text())
@@ -473,7 +761,207 @@ def get_full_analysis(ticker, term="short"):
     parts.append(get_fundamentals_text(ticker))
     parts.append(get_institutional_activity_text(ticker))
     parts.append(check_upcoming_results(ticker))
+    parts.append(get_recent_announcements_text(ticker))
     return "\n---\n".join(parts)
+
+
+def get_catalyst_scan_text(limit=15):
+    """UNVALIDATED, informational only - flags stocks with unusual volume, for the agent to then
+    check news on. Cannot be backtested (no historical news archive available)."""
+    price_cache = load_price_cache_short()
+    spikes = []
+    for ticker, stock_df in price_cache.items():
+        valid = stock_df.dropna(subset=['volume_change'])
+        if len(valid) == 0:
+            continue
+        latest = valid.iloc[-1]
+        if latest['volume_change'] > 1.0:  # 100%+ above previous day - a genuinely large spike
+            spikes.append({'ticker': ticker, 'volume_change_pct': round(latest['volume_change'] * 100, 1),
+                            'price': round(latest['close'], 2)})
+
+    if len(spikes) == 0:
+        return "No stocks currently show an unusual volume spike (>100% above prior day)."
+
+    spikes_df = pd.DataFrame(spikes).sort_values('volume_change_pct', ascending=False)
+    text = "UNVALIDATED catalyst scan - unusual volume spikes (informational only, not backtested):\n\n"
+    for _, row in spikes_df.head(limit).iterrows():
+        text += f"{row['ticker']}: Price ₹{row['price']}, Volume +{row['volume_change_pct']}% vs prior day\n"
+    text += "\nFor any of these, check news headlines to see if there's a real catalyst behind the volume.\n"
+    return text
+
+def get_exit_check_text():
+    positions = check_exit_signals()
+    if isinstance(positions, str):
+        return positions
+
+    text = "Exit check for open positions:\n\n"
+    for pos in positions:
+        if 'error' in pos:
+            text += f"{pos['ticker']}: {pos['error']}\n\n"
+            continue
+        try:
+            levels = get_swing_levels_short(pos['ticker']) if pos['term'] == 'short' else get_swing_levels_long(pos['ticker'])
+
+            live_price = get_live_price(pos['ticker'])
+            current = live_price if live_price is not None else levels['current_price']
+
+            stop = float(pos['stop_loss'])
+            target = float(pos['target'])
+
+            text += f"{pos['ticker']} ({pos['term']}, day {pos['days_held']}/{pos['horizon']}): Current ₹{current}, Entry ₹{pos['entry_price']}, Stop ₹{stop}, Target ₹{target}\n"
+
+            if current <= stop:
+                text += "  VERDICT: EXIT NOW - price has hit/breached your stop-loss (validated rule).\n"
+            elif current >= target:
+                text += "  VERDICT: EXIT NOW - price has hit/exceeded your target (validated rule).\n"
+            elif pos['days_held'] >= pos['horizon']:
+                text += "  VERDICT: EXIT NOW - holding period expired without hitting stop or target (validated time-exit rule).\n"
+            else:
+                if pos['term'] == 'short' and levels['rsi'] > 60:
+                    text += f"  CAUTION (unvalidated, informational only): RSI has risen to {levels['rsi']} - the oversold condition that triggered this trade no longer holds. Still technically HOLD per the validated rule, but momentum may be fading.\n"
+                elif pos['term'] == 'long' and not levels.get('in_uptrend', True):
+                    text += "  CAUTION (unvalidated, informational only): Price has broken below its uptrend structure (SMA50). Still technically HOLD per the validated rule, but the original setup thesis may be weakening.\n"
+                else:
+                    text += "  VERDICT: HOLD - within horizon, no stop/target hit, original setup still intact.\n"
+
+                try:
+                    vix_df = load_vix_cache()
+                    current_vix = vix_df['close'].iloc[-1]
+                    vix_20d_avg = vix_df['close'].tail(20).mean()
+                    if current_vix > vix_20d_avg * 1.3:
+                        text += f"  MARKET CAUTION (unvalidated): VIX has spiked to {current_vix:.1f} (20-day avg {vix_20d_avg:.1f}) - broader market stress has risen meaningfully since typical conditions. Doesn't override your stop/target rule, but worth watching this position more closely than usual.\n"
+                except Exception:
+                    pass
+        except Exception as e:
+            text += f"{pos['ticker']}: Could not fetch current data - {e}\n"
+        text += "\n"
+    return text
+
+def get_announcement_reaction_text(ticker):
+    """Shows how price/volume ACTUALLY moved since a stock's most recent significant announcement -
+    the objective, real reaction, rather than guessing what an announcement 'should' mean."""
+    symbol = ticker.replace(".NS", "")
+    try:
+        df = load_corp_announcements_cache()
+        matches = df[df['symbol'] == symbol].sort_values('sort_date', ascending=False)
+        if len(matches) == 0:
+            return f"{ticker}: No recent announcements to check reaction against."
+
+        latest = matches.iloc[0]
+        ann_date = datetime.strptime(latest['an_dt'].split()[0], '%d-%b-%Y')
+
+        price_cache = load_price_cache_short()
+        if ticker not in price_cache:
+            return f"{ticker}: Announcement found ({latest['desc']} on {latest['an_dt']}) but no price data to check reaction."
+
+        stock_df = price_cache[ticker]
+        stock_df = stock_df[pd.to_datetime(stock_df['date']) >= ann_date]
+        if len(stock_df) < 2:
+            return f"{ticker}: Announcement ({latest['desc']}, {latest['an_dt']}) too recent - not enough trading days yet to see real reaction."
+
+        price_before = stock_df.iloc[0]['close']
+        price_now = stock_df.iloc[-1]['close']
+        pct_move = ((price_now - price_before) / price_before) * 100
+
+        text = f"{ticker} reaction since '{latest['desc']}' ({latest['an_dt']}):\n"
+        text += f"Price move since announcement: {pct_move:+.1f}%\n"
+        text += f"Trading days since: {len(stock_df) - 1}\n"
+        text += "This is the market's REAL, observed verdict - not a prediction of what the announcement 'means'. "
+        text += "Now check get_snapshot_text or get_full_analysis to see if the CURRENT price action matches your validated entry criteria (RSI<30 short-term, or near-high+uptrend long-term).\n"
+        return text
+    except Exception as e:
+        return f"Reaction data unavailable: {e}"
+
+def get_upcoming_catalysts_scan(days_ahead=7):
+    """Proactively scans the WHOLE watchlist for stocks with results/board meetings coming up,
+    now attached to real sector-momentum context - so a beginner doesn't need to already know
+    which sector a company is in, or whether that sector is currently strong or weak."""
+    try:
+        df = load_upcoming_results()
+        sector_data = load_sector_rs_cache()
+
+        upcoming = []
+        for _, row in df.iterrows():
+            try:
+                result_date = datetime.strptime(row['date'], '%d-%b-%Y')
+                days_away = (result_date - datetime.now()).days
+                if 0 <= days_away <= days_ahead:
+                    ticker = f"{row['symbol']}.NS"
+                    sd = sector_data.get(ticker, {})
+                    upcoming.append({
+                        'symbol': row['symbol'], 'date': row['date'], 'days_away': days_away,
+                        'industry': sd.get('industry', 'Unknown'),
+                        'sector_momentum_60d': sd.get('sector_avg_momentum_60d'),
+                        'stock_momentum_60d': sd.get('stock_momentum_60d'),
+                    })
+            except Exception:
+                continue
+
+        if len(upcoming) == 0:
+            return f"No watchlist stocks have results scheduled in the next {days_ahead} days."
+
+        upcoming_df = pd.DataFrame(upcoming).sort_values('days_away')
+        text = f"Upcoming catalysts, next {days_ahead} days, WITH sector context (direction is never predictable in advance):\n\n"
+        for _, row in upcoming_df.iterrows():
+            text += f"{row['symbol']}.NS: Results in {row['days_away']} days ({row['date']})\n"
+            text += f"  Sector: {row['industry']}\n"
+            if pd.notna(row['sector_momentum_60d']):
+                sector_read = "growing" if row['sector_momentum_60d'] > 0 else "declining"
+                text += f"  Sector 60-day momentum: {row['sector_momentum_60d']:.1f}% ({sector_read})\n"
+                if pd.notna(row['stock_momentum_60d']):
+                    vs_sector = "in line with" if abs(row['stock_momentum_60d'] - row['sector_momentum_60d']) < 5 else ("outperforming" if row['stock_momentum_60d'] > row['sector_momentum_60d'] else "underperforming")
+                    text += f"  This stock's own momentum: {row['stock_momentum_60d']:.1f}% ({vs_sector} its sector)\n"
+            else:
+                text += "  Sector momentum data not available for this stock.\n"
+            text += "\n"
+        text += ("REMINDER: sector trend is context, not a prediction of the specific result. A weak sector "
+                 "with a struggling stock ahead of results deserves extra caution; a strong sector with a "
+                 "stock already outperforming is a mildly supportive backdrop - neither guarantees the outcome.\n")
+        return text
+    except Exception as e:
+        return f"Upcoming catalysts data unavailable: {e}"
+
+def get_live_price_text(ticker):
+    price = get_live_price(ticker)
+    if price is None:
+        return f"Could not fetch a live price for {ticker} right now."
+    return f"{ticker} live price: ₹{price}"
+
+def get_recent_announcements_text(ticker):
+    symbol = ticker.replace(".NS", "")
+    try:
+        df = load_corp_announcements_cache()
+        matches = df[df['symbol'] == symbol].sort_values('sort_date', ascending=False)
+        if len(matches) == 0:
+            return f"{ticker}: No recent corporate announcements in the cached window."
+        text = f"{ticker} recent corporate announcements:\n"
+        for _, row in matches.head(10).iterrows():
+            text += f"  {row['an_dt']}: {row['desc']}\n"
+            detail = row.get('attchmntText', '')
+            if detail and detail.strip() and detail.strip().lower() != row['desc'].strip().lower():
+                text += f"    Detail: {detail}\n"
+        text += "(Detail text is directly from the NSE filing when available - real, but sometimes generic. Direction/impact is never predictable in advance.)\n"
+        return text
+    except Exception as e:
+        return f"Announcements data unavailable: {e}"
+
+
+def get_significant_announcements_scan():
+    try:
+        df = load_corp_announcements_cache()
+        if len(df) == 0:
+            return "No corporate announcements cached for the watchlist in the current window."
+        mask = df['desc'].str.lower().apply(lambda d: any(kw in d for kw in HIGH_SIGNAL_ANNOUNCEMENT_KEYWORDS))
+        significant = df[mask].sort_values('sort_date', ascending=False)
+        if len(significant) == 0:
+            return "No high-signal corporate announcements found in the watchlist recently."
+        text = "Significant recent announcements (UNVALIDATED, informational only - direction is never predictable):\n\n"
+        for _, row in significant.head(30).iterrows():
+            text += f"{row['symbol']}.NS: {row['an_dt']} - {row['desc']}\n"
+        return text
+    except Exception as e:
+        return f"Significant announcements scan unavailable: {e}"
+
 
 TOOL_DEFINITIONS = [
     {"type": "function", "function": {
@@ -494,7 +982,17 @@ TOOL_DEFINITIONS = [
     {"type": "function", "function": {
         "name": "scan_watchlist_text_short",
         "description": "Scans watchlist for 4-6 day swing setups. Default RSI<30 (backtested strongest, z-score 8.08).",
-        "parameters": {"type": "object", "properties": {"limit": {"type": ["integer", "string"]}, "rsi_threshold": {"type": ["integer", "string"]}}}
+        "parameters": {"type": "object", "properties": {"limit": {"type": ["number", "string", "object"]}, "rsi_threshold": {"type": ["number", "string", "object"]}}}
+    }},
+    {"type": "function", "function": {
+    "name": "get_live_price_text",
+    "description": "Gets the current live price for ONE stock, bypassing any cache - use when the user wants to confirm the exact current price before acting, especially if cache freshness is in question.",
+    "parameters": {"type": "object", "properties": {"ticker": {"type": "string"}}, "required": ["ticker"]}
+}},
+    {"type": "function", "function": {
+        "name": "get_catalyst_scan_text",
+        "description": "UNVALIDATED, informational-only scan for stocks with unusual volume spikes (>100% above prior day) across the whole watchlist, regardless of RSI. This is NOT a backtested strategy - no historical news archive exists to test it. Use to find candidates worth checking for real news catalysts, not as a standalone signal.",
+        "parameters": {"type": "object", "properties": {"limit": {"type": ["number", "string", "object"]}}}
     }},
     {"type": "function", "function": {
         "name": "scan_watchlist_text_long",
@@ -502,7 +1000,7 @@ TOOL_DEFINITIONS = [
         "parameters": {
             "type": "object",
             "properties": {
-                "limit": {"type": "integer"},
+                "limit": {"type": ["number", "string", "object"]},
                 "validated_only": {"type": ["boolean", "string"], "description": "If true (default), only show validated setups. If false, broader unfiltered view."}
             }
         }
@@ -523,53 +1021,83 @@ TOOL_DEFINITIONS = [
         "parameters": {"type": "object", "properties": {"ticker": {"type": "string"}}, "required": ["ticker"]}
     }},
     {"type": "function", "function": {
-    "name": "get_market_regime_text",
-    "description": "Gets overall market breadth and regime (bullish/bearish/mixed) - NOT stock-specific. Use when asked about general market conditions, or note it's automatically included in get_full_analysis for long-term picks.",
+        "name": "get_market_regime_text",
+        "description": "Gets overall market breadth and regime (bullish/bearish/mixed) - NOT stock-specific. Use when asked about general market conditions, or note it's automatically included in get_full_analysis for long-term picks.",
+        "parameters": {"type": "object", "properties": {}}
+    }},
+    {"type": "function", "function": {
+        "name": "record_trade_entry",
+        "description": "Logs a real trade entry - freezes the current signal snapshot (RSI, momentum, regime, etc.) permanently for future reference. Call this when the user says they've actually entered/bought a position.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "ticker": {"type": "string"}, "term": {"type": "string", "enum": ["short", "long"]},
+                "shares": {"type": ["number", "string", "object"]}, "capital_used": {"type": ["number", "string", "object"]},
+                "risk_pct": {"type": ["number", "string", "object"]}, "entry_price": {"type": ["number", "string", "object"], "description": "Actual fill price if different from current market price"}
+            },
+            "required": ["ticker", "term", "shares", "capital_used", "risk_pct"]
+        }
+    }},
+    {"type": "function", "function": {
+    "name": "get_significant_announcements_scan",
+    "description": "Proactively scans the WHOLE watchlist for high-signal corporate announcements (management changes, takeover disclosures, M&A, fundraising) in the last 5 days. UNVALIDATED, informational only - tells you WHAT was announced, never predicts market direction.",
     "parameters": {"type": "object", "properties": {}}
+}},
+{"type": "function", "function": {
+    "name": "get_recent_announcements_text",
+    "description": "All recent corporate announcements for ONE specific stock, any category.",
+    "parameters": {"type": "object", "properties": {"ticker": {"type": "string"}}, "required": ["ticker"]}
 }},
     {"type": "function", "function": {
-    "name": "record_trade_entry",
-    "description": "Logs a real trade entry - freezes the current signal snapshot (RSI, momentum, regime, etc.) permanently for future reference. Call this when the user says they've actually entered/bought a position.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "ticker": {"type": "string"}, "term": {"type": "string", "enum": ["short", "long"]},
-            "shares": {"type": ["integer", "string"]}, "capital_used": {"type": ["number", "string"]},
-            "risk_pct": {"type": ["number", "string"]}, "entry_price": {"type": ["number", "string"], "description": "Actual fill price if different from current market price"}
-        },
-        "required": ["ticker", "term", "shares", "capital_used", "risk_pct"]
-    }
+        "name": "record_trade_exit",
+        "description": "Logs a real trade exit and computes the actual return. Call this when the user says they've sold/closed a position.",
+        "parameters": {"type": "object", "properties": {"ticker": {"type": "string"}, "exit_price": {"type": ["number", "string", "object"]}}, "required": ["ticker", "exit_price"]}
+    }},
+    {"type": "function", "function": {
+        "name": "get_open_positions",
+        "description": "Lists all currently open logged trades.",
+        "parameters": {"type": "object", "properties": {}}
+    }},
+    {"type": "function", "function": {
+        "name": "get_similar_past_trades",
+        "description": "Retrieves the user's own past closed trades matching a given profile (term, and for long-term, whether it was a validated setup), with honest win rate/return stats. ALWAYS includes explicit sample-size caveats - never overstate confidence from few trades. Use this before finalizing any recommendation to ground it in the user's real personal track record.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "term": {"type": "string", "enum": ["short", "long"]},
+                "validated_setup": {"type": ["boolean", "string"], "description": "Optional, long-term only - filter to only validated setups"}
+            },
+            "required": ["term"]
+        }
+    }},
+    {"type": "function", "function": {
+    "name": "get_announcement_reaction_text",
+    "description": "Shows the REAL, observed price/volume reaction since a stock's most recent significant announcement - use this instead of guessing what an announcement means. After checking reaction, always follow up with get_full_analysis to see if the current price now matches a validated entry rule.",
+    "parameters": {"type": "object", "properties": {"ticker": {"type": "string"}}, "required": ["ticker"]}
+    }},
+    {"type": "function", "function": {
+        "name": "get_exit_check_text",
+        "description": "Actively checks all open logged positions against the validated exit rule (stop/target/time-expiry) plus early-warning momentum reversal context. Use whenever the user asks whether to hold or exit, or wants a status check on open trades.",
+        "parameters": {"type": "object", "properties": {}}
+    }},
+    {"type": "function", "function": {
+    "name": "get_upcoming_catalysts_scan",
+    "description": "Proactively scans the WHOLE watchlist for stocks with results or board meetings scheduled in the next N days - a 'watch this week' list. Does NOT predict direction of the move, only tells you WHAT is scheduled and WHEN.",
+    "parameters": {"type": "object", "properties": {"days_ahead": {"type": ["number", "string", "object"]}}}
 }},
-{"type": "function", "function": {
-    "name": "record_trade_exit",
-    "description": "Logs a real trade exit and computes the actual return. Call this when the user says they've sold/closed a position.",
-    "parameters": {"type": "object", "properties": {"ticker": {"type": "string"}, "exit_price": {"type": ["number", "string"]}}, "required": ["ticker", "exit_price"]}
-}},
-{"type": "function", "function": {
-    "name": "get_open_positions",
-    "description": "Lists all currently open logged trades.",
-    "parameters": {"type": "object", "properties": {}}
-}},
-{"type": "function", "function": {
-    "name": "get_similar_past_trades",
-    "description": "Retrieves the user's own past closed trades matching a given profile (term, and for long-term, whether it was a validated setup), with honest win rate/return stats. ALWAYS includes explicit sample-size caveats - never overstate confidence from few trades. Use this before finalizing any recommendation to ground it in the user's real personal track record.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "term": {"type": "string", "enum": ["short", "long"]},
-            "validated_setup": {"type": ["boolean", "string"], "description": "Optional, long-term only - filter to only validated setups"}
-        },
-        "required": ["term"]
-    }
-}},
+    {"type": "function", "function": {
+        "name": "get_strategy_health_text",
+        "description": "Compares the user's REAL closed trades against the backtested expectation, and runs a CUSUM decay alarm. Use when asked how the strategy is performing, whether it still works, or whether results are on track. Always relay the sample-size caveat and the note about the most recent 12 months.",
+        "parameters": {"type": "object", "properties": {"term": {"type": "string", "enum": ["short", "long"]}}}
+    }},
     {"type": "function", "function": {
         "name": "calculate_position_size",
         "description": "Calculates shares to buy given capital and risk %. Will BLOCK and return a warning instead of sizing if risk_pct exceeds 2%, or if the stock has an extreme/parabolic move flag (long-term only) - requires confirmed=true to override after explicitly asking the user. ticker is REQUIRED and must be a real stock symbol - if the user hasn't named a specific stock, scan first to find one before calling this.",
         "parameters": {
             "type": "object",
             "properties": {
-                "ticker": {"type": "string"}, "total_capital": {"type": ["number", "string"]},
-                "risk_pct": {"type": ["number", "string"]}, "term": {"type": "string", "enum": ["short", "long"]},
+                "ticker": {"type": "string"}, "total_capital": {"type": ["number", "string", "object"]},
+                "risk_pct": {"type": ["number", "string", "object"]}, "term": {"type": "string", "enum": ["short", "long"]},
                 "confirmed": {"type": ["boolean", "string"], "description": "Set to true only after the user has explicitly confirmed they want to proceed despite a warning."}
             },
             "required": ["ticker", "total_capital"]
@@ -586,18 +1114,28 @@ def execute_tool(function_name, function_args):
     elif function_name == "get_full_analysis":
         return get_full_analysis(function_args['ticker'], function_args.get('term', 'short'))
     elif function_name == "scan_watchlist_text_short":
-        limit = parse_number(function_args.get('limit', 30), default=30)
+        limit = int(parse_number(function_args.get('limit', 30), default=30))
         rsi_threshold = parse_number(function_args.get('rsi_threshold', 30), default=30)
         return scan_watchlist_text_short(limit, rsi_threshold)
     elif function_name == "scan_watchlist_text_long":
         validated_only = parse_bool(function_args.get('validated_only', True))
-        return scan_watchlist_text_long(function_args.get('limit', 30), validated_only)
+        limit = int(parse_number(function_args.get('limit', 30), default=30))
+        return scan_watchlist_text_long(limit, validated_only)
+    elif function_name == "get_catalyst_scan_text":
+        limit = int(parse_number(function_args.get('limit', 15), default=15))
+        return get_catalyst_scan_text(limit)
     elif function_name == "record_trade_entry":
         return record_trade_entry(
             function_args['ticker'], function_args['term'],
-            parse_number(function_args['shares']), parse_number(function_args['capital_used']),
+            int(parse_number(function_args['shares'])), parse_number(function_args['capital_used']),
             parse_number(function_args['risk_pct']), parse_number(function_args.get('entry_price'))
         )
+    elif function_name == "get_significant_announcements_scan":
+        return get_significant_announcements_scan()
+    elif function_name == "get_recent_announcements_text":
+        return get_recent_announcements_text(function_args['ticker'])
+    elif function_name == "get_live_price_text":
+        return get_live_price_text(function_args['ticker'])
     elif function_name == "record_trade_exit":
         return record_trade_exit(function_args['ticker'], parse_number(function_args['exit_price']))
     elif function_name == "get_open_positions":
@@ -610,17 +1148,23 @@ def execute_tool(function_name, function_args):
         return get_fundamentals_text(function_args['ticker'])
     elif function_name == "get_institutional_activity_text":
         return get_institutional_activity_text(function_args['ticker'])
+    elif function_name == "get_announcement_reaction_text":
+        return get_announcement_reaction_text(function_args['ticker'])
+    elif function_name == "get_upcoming_catalysts_scan":
+        days_ahead = int(parse_number(function_args.get('days_ahead', 7), default=7))
+        return get_upcoming_catalysts_scan(days_ahead)
+    elif function_name == "get_exit_check_text":
+        return get_exit_check_text()
     elif function_name == "get_market_regime_text":
         return get_market_regime_text()
     elif function_name == "check_upcoming_results":
         return check_upcoming_results(function_args['ticker'])
+    elif function_name == "get_strategy_health_text":
+        return get_strategy_health(function_args.get('term', 'short'))
     elif function_name == "calculate_position_size":
-        ticker = function_args.get('ticker', '').strip()
-        if not ticker:
-            return "No ticker was provided. First scan for a candidate (scan_watchlist_text_short or scan_watchlist_text_long) to find a specific stock, then call this tool with that ticker."
         confirmed = parse_bool(function_args.get('confirmed', False), default=False)
-        total_capital = parse_number(function_args.get('total_capital'))
-        risk_pct = parse_number(function_args.get('risk_pct', 1.0), default=1.0)
-        pos = calculate_position_size(ticker, total_capital, risk_pct, function_args.get('term', 'short'), confirmed)
+        total_capital = parse_number(function_args.get('total_capital'), default=DEFAULT_CAPITAL)
+        risk_pct = parse_number(function_args.get('risk_pct', DEFAULT_RISK_PCT), default=DEFAULT_RISK_PCT)
+        pos = calculate_position_size(function_args.get('ticker', ''), total_capital, risk_pct, function_args.get('term', 'short'), confirmed)
         return json.dumps(pos, indent=2)
     return "Unknown function"

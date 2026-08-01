@@ -7,11 +7,11 @@ import pickle
 import os
 import time
 import nsefin
+from features import add_short_features, add_long_features, MIN_BARS
 
-CACHE_DIR = "cache"
+CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
 PRICE_CACHE_FILE_SHORT = os.path.join(CACHE_DIR, "price_data_short.pkl")
 PRICE_CACHE_FILE_LONG = os.path.join(CACHE_DIR, "price_data_long.pkl")
-DELIVERY_CACHE_FILE = os.path.join(CACHE_DIR, "delivery_data.pkl")
 BULK_DEALS_CACHE_FILE = os.path.join(CACHE_DIR, "bulk_deals_data.pkl")
 CACHE_META_FILE = os.path.join(CACHE_DIR, "cache_meta.pkl")
 DELIVERY_HISTORY_FILE = os.path.join(CACHE_DIR, "delivery_history.pkl")
@@ -19,15 +19,28 @@ RESULTS_CACHE_FILE = os.path.join(CACHE_DIR, "upcoming_results.pkl")
 NIFTY_CACHE_FILE = os.path.join(CACHE_DIR, "nifty_data.pkl")
 SECTOR_RS_CACHE_FILE = os.path.join(CACHE_DIR, "sector_rs_data.pkl")
 MARKET_BREADTH_CACHE_FILE = os.path.join(CACHE_DIR, "market_breadth.pkl")
+CORP_ANNOUNCEMENTS_CACHE_FILE = os.path.join(CACHE_DIR, "corp_announcements.pkl")
+VIX_CACHE_FILE = os.path.join(CACHE_DIR, "vix_data.pkl")
+CATEGORY_FLOWS_FILE = os.path.join(CACHE_DIR, "category_flows.pkl")
 
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 
-def refresh_price_cache_long(tickers):
-    print(f"Downloading price data for {len(tickers)} stocks (batched)...")
-    raw = yf.download(tickers, period="2y", interval="1d", progress=True, auto_adjust=True, group_by='ticker')
+def _load_pickle(path, what):
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"{what} cache missing ({os.path.basename(path)}) - run refresh_cache.py")
+    with open(path, 'rb') as f:
+        return pickle.load(f)
 
-    all_features = {}
+
+def refresh_price_cache_long(tickers):
+    print(f"Downloading LONG-TERM price data for {len(tickers)} stocks...")
+    # Must be chunked exactly like the short path. Firing all ~750 tickers at Yahoo in one
+    # call gets throttled hard, and yfinance reports throttled tickers as "possibly delisted;
+    # no price data found" - which is why SBIN, HINDUNILVR, HCLTECH etc. appeared to vanish.
+    raw = chunked_download(tickers, chunk_size=100, period="2y", interval="1d", auto_adjust=True)
+
+    all_features, missing = {}, []
     for ticker in tickers:
         try:
             stock_df = raw[ticker].copy() if len(tickers) > 1 else raw.copy()
@@ -35,45 +48,56 @@ def refresh_price_cache_long(tickers):
             stock_df.columns = [str(c).lower() for c in stock_df.columns]
             stock_df = stock_df.dropna(subset=['close'])
 
-            if len(stock_df) < 260:
+            if len(stock_df) < MIN_BARS:
+                missing.append(ticker)
                 continue
 
-            stock_df['rsi'] = ta.momentum.RSIIndicator(close=stock_df['close'], window=14).rsi()
-            stock_df['sma_50'] = ta.trend.SMAIndicator(close=stock_df['close'], window=50).sma_indicator()
-            stock_df['sma_200'] = ta.trend.SMAIndicator(close=stock_df['close'], window=200).sma_indicator()
-            stock_df['momentum_60d'] = stock_df['close'].pct_change(60) * 100
-            stock_df['dist_from_high_252'] = (stock_df['close'] / stock_df['close'].rolling(252).max()) - 1
-            stock_df['volume_change'] = stock_df['volume'].pct_change()
-            stock_df['price_change'] = stock_df['close'].pct_change()
+            all_features[ticker] = add_long_features(stock_df)
+        except Exception:
+            missing.append(ticker)
 
-            atr_indicator = ta.volatility.AverageTrueRange(high=stock_df['high'], low=stock_df['low'], close=stock_df['close'], window=14)
-            stock_df['atr'] = atr_indicator.average_true_range()
-            stock_df['atr_pct'] = (stock_df['atr'] / stock_df['close']) * 100
-
-            all_features[ticker] = stock_df
-        except Exception as e:
-            print(f"  Skipped {ticker}: {e}")
+    all_features = _retry_missing(missing, all_features, add_long_features, "long")
 
     with open(PRICE_CACHE_FILE_LONG, 'wb') as f:
         pickle.dump(all_features, f)
-    print(f"Price cache saved: {len(all_features)} stocks")
+    print(f"Long-term price cache saved: {len(all_features)}/{len(tickers)} stocks")
     return all_features
 
-def refresh_delivery_cache(trade_date=None):
-    """Fetches WHOLE MARKET delivery data in one call, caches it."""
-    if trade_date is None:
-        trade_date = datetime.now().strftime('%d-%m-%Y')
-    print(f"Downloading whole-market delivery data for {trade_date}...")
-    try:
-        df = capital_market.bhav_copy_with_delivery(trade_date=trade_date)
-        with open(DELIVERY_CACHE_FILE, 'wb') as f:
-            pickle.dump(df, f)
-        print(f"Delivery cache saved: {len(df)} stocks")
-        return df
-    except Exception as e:
-        print(f"Delivery cache failed (market may be closed today/holiday): {e}")
-        return None
 
+def _retry_missing(missing, all_features, feature_fn, label, chunk_size=25):
+    """Second pass over tickers that came back empty.
+
+    Most first-pass failures are throttling, not delisting - a smaller, slower retry usually
+    recovers the bulk of them. Anything still missing after this is genuinely unavailable.
+    """
+    if not missing:
+        return all_features
+    print(f"  retrying {len(missing)} {label} ticker(s) that returned no data...")
+    time.sleep(5)
+    try:
+        raw = chunked_download(missing, chunk_size=chunk_size, period="2y",
+                               interval="1d", auto_adjust=True)
+    except Exception as e:
+        print(f"  retry failed: {e}")
+        return all_features
+
+    recovered = 0
+    for ticker in missing:
+        try:
+            df = raw[ticker].copy() if len(missing) > 1 else raw.copy()
+            df = df.reset_index()
+            df.columns = [str(c).lower() for c in df.columns]
+            df = df.dropna(subset=['close'])
+            if len(df) < MIN_BARS:
+                continue
+            all_features[ticker] = feature_fn(df)
+            recovered += 1
+        except Exception:
+            continue
+    still = len(missing) - recovered
+    print(f"  recovered {recovered}, still missing {still}"
+          + (f" (likely genuinely delisted/suspended)" if still else ""))
+    return all_features
 
 def refresh_bulk_deals_cache(days=60):
     """Fetches whole-market bulk deals for the date range, caches it."""
@@ -105,14 +129,8 @@ def get_cache_age():
     return age
 
 
-def load_delivery_cache():
-    with open(DELIVERY_CACHE_FILE, 'rb') as f:
-        return pickle.load(f)
-
-
 def load_bulk_deals_cache():
-    with open(BULK_DEALS_CACHE_FILE, 'rb') as f:
-        return pickle.load(f)
+    return _load_pickle(BULK_DEALS_CACHE_FILE, "bulk deals")
 
 def backfill_delivery_history(tickers, target_days=30, max_calendar_days_back=50):
     """One-time backfill: pulls the last ~30 trading days of delivery data. Run this once."""
@@ -175,8 +193,7 @@ def update_delivery_history(tickers, keep_days=30):
 
 
 def load_delivery_history():
-    with open(DELIVERY_HISTORY_FILE, 'rb') as f:
-        return pickle.load(f)
+    return _load_pickle(DELIVERY_HISTORY_FILE, "delivery history")
 
 def refresh_upcoming_results_cache():
     """Fetches the whole-market upcoming results/board meeting calendar in one call."""
@@ -194,56 +211,41 @@ def refresh_upcoming_results_cache():
 
 
 def load_upcoming_results():
-    with open(RESULTS_CACHE_FILE, 'rb') as f:
-        return pickle.load(f)
+    return _load_pickle(RESULTS_CACHE_FILE, "upcoming results")
 
 def refresh_price_cache_short(tickers):
     print(f"Downloading SHORT-TERM price data for {len(tickers)} stocks...")
-    raw = chunked_download(tickers, chunk_size=100, period="6mo", interval="1d", auto_adjust=True)
+    raw = chunked_download(tickers, chunk_size=100, period="2y", interval="1d", auto_adjust=True)
 
-    all_features = {}
+    all_features, missing = {}, []
     for ticker in tickers:
         try:
             stock_df = raw[ticker].copy() if len(tickers) > 1 else raw.copy()
             stock_df = stock_df.reset_index()
             stock_df.columns = [str(c).lower() for c in stock_df.columns]
             stock_df = stock_df.dropna(subset=['close'])
-            if len(stock_df) < 60:
+            if len(stock_df) < MIN_BARS:
+                missing.append(ticker)
                 continue
 
-            stock_df['rsi'] = ta.momentum.RSIIndicator(close=stock_df['close'], window=14).rsi()
-            macd = ta.trend.MACD(close=stock_df['close'])
-            stock_df['macd'] = macd.macd()
-            stock_df['macd_signal'] = macd.macd_signal()
-            stock_df['sma_20'] = ta.trend.SMAIndicator(close=stock_df['close'], window=20).sma_indicator()
-            stock_df['sma_50'] = ta.trend.SMAIndicator(close=stock_df['close'], window=50).sma_indicator()
-            stock_df['volume_change'] = stock_df['volume'].pct_change()
-            stock_df['price_change'] = stock_df['close'].pct_change()
-            stock_df['volatility_10'] = stock_df['close'].rolling(10).std()
-            stock_df['distance_from_high_50'] = (stock_df['close'] / stock_df['close'].rolling(50).max()) - 1
+            all_features[ticker] = add_short_features(stock_df)
+        except Exception:
+            missing.append(ticker)
 
-            atr_indicator = ta.volatility.AverageTrueRange(high=stock_df['high'], low=stock_df['low'], close=stock_df['close'], window=14)
-            stock_df['atr'] = atr_indicator.average_true_range()
-            stock_df['atr_pct'] = (stock_df['atr'] / stock_df['close']) * 100
-
-            all_features[ticker] = stock_df
-        except Exception as e:
-            print(f"  Skipped {ticker}: {e}")
+    all_features = _retry_missing(missing, all_features, add_short_features, "short")
 
     with open(PRICE_CACHE_FILE_SHORT, 'wb') as f:
         pickle.dump(all_features, f)
-    print(f"Short-term price cache saved: {len(all_features)} stocks")
+    print(f"Short-term price cache saved: {len(all_features)}/{len(tickers)} stocks")
     return all_features
 
 
 def load_price_cache_short():
-    with open(PRICE_CACHE_FILE_SHORT, 'rb') as f:
-        return pickle.load(f)
+    return _load_pickle(PRICE_CACHE_FILE_SHORT, "short-term price")
 
 
 def load_price_cache_long():
-    with open(PRICE_CACHE_FILE_LONG, 'rb') as f:
-        return pickle.load(f)
+    return _load_pickle(PRICE_CACHE_FILE_LONG, "long-term price")
 
 def refresh_nifty_cache():
     """Caches Nifty 50 index data - used to compute relative strength and overall market trend."""
@@ -261,14 +263,13 @@ def refresh_nifty_cache():
     return df
 
 def load_nifty_cache():
-    with open(NIFTY_CACHE_FILE, 'rb') as f:
-        return pickle.load(f)
+    return _load_pickle(NIFTY_CACHE_FILE, "Nifty")
 
 def refresh_sector_relative_strength():
     """Computes each stock's 60-day momentum relative to its own industry peers - 
     catches cases where a stock is just riding a sector-wide rally, not genuinely outperforming."""
     price_cache = load_price_cache_long()
-    watchlist_df = pd.read_csv('nse_watchlist_full.csv')
+    watchlist_df = pd.read_csv(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'nse_watchlist_expanded.csv'))
     ticker_to_industry = dict(zip(watchlist_df['ticker'], watchlist_df['Industry']))
 
     ticker_momentum = {}
@@ -303,8 +304,7 @@ def refresh_sector_relative_strength():
 
 
 def load_sector_rs_cache():
-    with open(SECTOR_RS_CACHE_FILE, 'rb') as f:
-        return pickle.load(f)
+    return _load_pickle(SECTOR_RS_CACHE_FILE, "sector relative strength")
 
 def refresh_market_breadth():
     """Computes overall market regime: % of watchlist stocks above their 200-day average (breadth), 
@@ -325,7 +325,25 @@ def refresh_market_breadth():
 
     breadth_pct = round((above_200_count / total_count) * 100, 1) if total_count > 0 else None
 
+    # Market-wide volatility percentile within its own trailing year. Mean-reversion needs
+    # panic to revert from: measured on 5y, RSI<30 nets -0.81%/trade in the calmest quartile
+    # and +1.64% in the most volatile (z=9.27, point-in-time). This is the opposite of the
+    # usual "cut risk when vol rises" rule, which is written for trend-following.
+    vol_by_date = {}
+    for _, stock_df in load_price_cache_short().items():
+        for dt, a in zip(stock_df['date'].values, stock_df['atr_pct'].values):
+            if pd.notna(a):
+                vol_by_date.setdefault(dt, []).append(a)
+    mkt_vol_pct = None
+    if len(vol_by_date) > 60:
+        series = pd.Series({k: sum(v) / len(v) for k, v in vol_by_date.items()}).sort_index()
+        window = series.tail(252)
+        if len(window) > 60:
+            mkt_vol_pct = round(float((window[:-1] < window.iloc[-1]).mean()), 3)
+
     nifty_valid = nifty_df.dropna(subset=['sma_200', 'close'])
+    if len(nifty_valid) == 0:
+        return None
     nifty_latest = nifty_valid.iloc[-1]
     nifty_above_200 = bool(nifty_latest['close'] > nifty_latest['sma_200'])
 
@@ -343,6 +361,7 @@ def refresh_market_breadth():
         'nifty_above_200sma': nifty_above_200,
         'regime': regime,
         'stocks_checked': total_count,
+        'market_vol_percentile': mkt_vol_pct,
     }
 
     with open(MARKET_BREADTH_CACHE_FILE, 'wb') as f:
@@ -352,8 +371,7 @@ def refresh_market_breadth():
 
 
 def load_market_breadth_cache():
-    with open(MARKET_BREADTH_CACHE_FILE, 'rb') as f:
-        return pickle.load(f)
+    return _load_pickle(MARKET_BREADTH_CACHE_FILE, "market breadth")
 
 def chunked_download(tickers, chunk_size=100, **kwargs):
     """Downloads in smaller batches to avoid Yahoo rate-limiting on very large single requests."""
@@ -367,3 +385,124 @@ def chunked_download(tickers, chunk_size=100, **kwargs):
 
     combined = pd.concat(all_chunks, axis=1)
     return combined
+
+def refresh_vix_cache():
+    """Caches India VIX - the market's own measure of expected volatility/fear."""
+    print("Downloading India VIX data...")
+    df = yf.download("^INDIAVIX", period="6mo", interval="1d", progress=False, auto_adjust=True)
+    df.columns = df.columns.get_level_values(0)
+    df = df.reset_index()
+    df.columns = [str(c).lower() for c in df.columns]
+    with open(VIX_CACHE_FILE, 'wb') as f:
+        pickle.dump(df, f)
+    print("VIX cache saved")
+    return df
+
+def load_vix_cache():
+    return _load_pickle(VIX_CACHE_FILE, "VIX")
+
+def refresh_corp_announcements_cache(tickers, days_back=5):
+    """Caches recent corporate announcements filtered to the watchlist - whole-market volume is too large to cache in full."""
+    nse = nsefin.NSEClient()
+    symbols = set(t.replace(".NS", "") for t in tickers)
+    to_date = datetime.now()
+    from_date = to_date - timedelta(days=days_back)
+
+    print(f"Downloading corporate announcements ({days_back} days)...")
+    try:
+        df = nse.get_corporate_announcements(
+            from_date_str=from_date.strftime('%d-%m-%Y'),
+            to_date_str=to_date.strftime('%d-%m-%Y')
+        )
+        df_filtered = df[df['symbol'].isin(symbols)].copy()
+        with open(CORP_ANNOUNCEMENTS_CACHE_FILE, 'wb') as f:
+            pickle.dump(df_filtered, f)
+        print(f"Corporate announcements cache saved: {len(df_filtered)} rows for watchlist")
+        return df_filtered
+    except Exception as e:
+        print(f"Corporate announcements cache failed: {e}")
+        return None
+
+def load_corp_announcements_cache():
+    return _load_pickle(CORP_ANNOUNCEMENTS_CACHE_FILE, "corporate announcements")
+
+
+# NSE changed this file's schema around April 2023. Before that it published only
+# BNK / DFI / PRO-TRADES / OTHERS - no FPI or Retail split - so earlier dates are
+# useless for flow analysis and are not worth fetching.
+CATEGORY_FLOWS_START = "2023-04-01"
+_CATEGORY_ALIASES = {'AIFS': 'AIF', 'INSURANCE_COMPANIES': 'INSURANCE', 'BNK': 'BANK'}
+
+
+def _normalize_flows(df):
+    """NSE's category labels drift ('Retail'/'RETAIL', 'AIFs'/'AIF', 'BNK'/'Bank') - fold them
+    together, or a query for one category silently misses part of the history."""
+    out = pd.DataFrame({
+        'date': pd.to_datetime(df['Trade Date'], format='%d-%b-%Y', errors='coerce'),
+        'category': (df['Category'].astype(str).str.strip().str.upper()
+                     .str.replace(r'[\s\-]+', '_', regex=True)),
+        'buy_cr': pd.to_numeric(df['Buy Value in Rs.Crores'], errors='coerce'),
+        'sell_cr': pd.to_numeric(df['Sell Value in Rs.Crores'], errors='coerce'),
+        'net_cr': pd.to_numeric(df['Net Value in Rs.Crores'], errors='coerce'),
+    })
+    out['category'] = out['category'].replace(_CATEGORY_ALIASES)
+    return out.dropna(subset=['date'])
+
+
+def _merge_flows(existing, new):
+    combined = pd.concat([existing, new], ignore_index=True)
+    combined = combined.drop_duplicates(subset=['date', 'category'], keep='last')
+    return combined.sort_values(['date', 'category']).reset_index(drop=True)
+
+
+def update_category_flows(days_back=10, since=None):
+    """Appends NSE's category-wise cash turnover: daily net buy/sell in Rs crores per
+    participant type (FPI, MUTUAL_FUNDS, INSURANCE, BANK, AIF, PMS, RETAIL, OTHERS).
+
+    This is the closest thing Indian markets publish to a direct retail-vs-institutional
+    positioning read. One file per trading day, published with roughly a one-day lag, so
+    this walks a date window and fetches whatever is missing. Weekends, holidays and
+    not-yet-published days 404 and are skipped.
+    """
+    try:
+        existing = _load_pickle(CATEGORY_FLOWS_FILE, "category flows")
+    except FileNotFoundError:
+        existing = pd.DataFrame(columns=['date', 'category', 'buy_cr', 'sell_cr', 'net_cr'])
+
+    start = pd.Timestamp(since) if since else pd.Timestamp.today() - pd.Timedelta(days=days_back)
+    start = max(start, pd.Timestamp(CATEGORY_FLOWS_START))
+    have = set(pd.to_datetime(existing['date'])) if len(existing) else set()
+    wanted = [d for d in pd.bdate_range(start, pd.Timestamp.today()) if d not in have]
+
+    print(f"Downloading category flows for {len(wanted)} missing day(s)...")
+    fetched, no_file = [], 0
+    for d in wanted:
+        try:
+            raw = capital_market.category_turnover_cash(d.strftime('%d-%m-%Y'))
+            fetched.append(_normalize_flows(raw))
+        except Exception:
+            no_file += 1
+        time.sleep(0.3)
+
+    if fetched:
+        existing = _merge_flows(existing, pd.concat(fetched, ignore_index=True))
+        with open(CATEGORY_FLOWS_FILE, 'wb') as f:
+            pickle.dump(existing, f)
+
+    days = existing['date'].nunique() if len(existing) else 0
+    print(f"Category flows cache: {len(existing)} rows over {days} trading days "
+          f"({no_file} of {len(wanted)} requested day(s) had no file - weekends/holidays/lag)")
+    return existing
+
+
+def load_category_flows():
+    return _load_pickle(CATEGORY_FLOWS_FILE, "category flows")
+
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "backfill-flows":
+        since = sys.argv[2] if len(sys.argv) > 2 else CATEGORY_FLOWS_START
+        update_category_flows(since=since)
+    else:
+        print("usage: python cache_manager.py backfill-flows [YYYY-MM-DD]")

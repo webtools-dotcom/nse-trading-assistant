@@ -1,8 +1,11 @@
 import pandas as pd
+import numpy as np
 import os
 from datetime import datetime
+from config import SHORT_HORIZON_DAYS, LONG_HORIZON_DAYS
 
-TRADE_LOG_FILE = "trade_log.csv"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TRADE_LOG_FILE = os.path.join(BASE_DIR, "trade_log.csv")
 
 COLUMNS = [
     'trade_id', 'ticker', 'term', 'entry_date', 'entry_price', 'stop_loss', 'target',
@@ -14,20 +17,43 @@ COLUMNS = [
 ]
 
 
+def _parse_date(value):
+    """Accepts both ISO (2026-07-06) and M/D/YYYY (7/6/2026, from a spreadsheet round-trip)."""
+    return pd.to_datetime(value, errors='coerce')
+
+
 def _load_log():
-    if not os.path.exists(TRADE_LOG_FILE):
+    if not os.path.exists(TRADE_LOG_FILE) or os.path.getsize(TRADE_LOG_FILE) == 0:
         return pd.DataFrame(columns=COLUMNS, dtype=object)
-    return pd.read_csv(TRADE_LOG_FILE, dtype=object)
+    df = pd.read_csv(TRADE_LOG_FILE, dtype=object)
+    df = df.reindex(columns=COLUMNS)
+    for col in ('entry_date', 'exit_date'):
+        parsed = _parse_date(df[col])
+        df[col] = parsed.dt.strftime('%Y-%m-%d').where(parsed.notna(), df[col])
+    return df
 
 def _save_log(df):
     df.to_csv(TRADE_LOG_FILE, index=False)
 
 
 def log_trade_entry(ticker, term, shares, capital_used, risk_pct, levels, market_regime=None, entry_price=None):
-    """Freezes the current signal snapshot (already computed by tools.py) into a new open trade row."""
     df = _load_log()
 
-    actual_entry_price = entry_price if entry_price is not None else levels['current_price']
+    live_price = None
+    try:
+        from data_fetcher import get_live_price
+        live_price = get_live_price(ticker)
+    except Exception:
+        pass
+
+    reference_price = live_price if live_price is not None else levels['current_price']
+
+    if entry_price is not None and reference_price is not None:
+        if abs(entry_price - reference_price) / reference_price > 0.15:
+            # Provided entry_price is wildly off from real price - almost certainly an error, ignore it
+            entry_price = None
+
+    actual_entry_price = entry_price if entry_price is not None else reference_price
     trade_id = f"{ticker}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
     row = {col: None for col in COLUMNS}
@@ -69,7 +95,7 @@ def log_trade_exit(ticker, exit_price):
     if len(open_trades) == 0:
         return {'error': f"No open trade found for {ticker}. Did you log the entry first?"}
 
-    idx = open_trades.sort_values('entry_date').index[-1]
+    idx = _parse_date(open_trades['entry_date']).sort_values().index[-1]
     row = df.loc[idx]
 
     entry_price = float(row['entry_price'])
@@ -77,8 +103,8 @@ def log_trade_exit(ticker, exit_price):
     target = float(row['target']) if pd.notna(row['target']) else None
 
     return_pct = ((exit_price - entry_price) / entry_price) * 100
-    entry_date = datetime.strptime(row['entry_date'], '%Y-%m-%d')
-    holding_days = (datetime.now() - entry_date).days
+    entry_date = _parse_date(row['entry_date'])
+    holding_days = int(np.busday_count(entry_date.date(), datetime.now().date())) if pd.notna(entry_date) else None
 
     if stop_loss is not None and exit_price <= stop_loss * 1.01:
         exit_type = 'stop_loss'
@@ -141,3 +167,71 @@ def get_similar_past_trades(term, validated_setup=None):
     for _, row in closed.sort_values('entry_date').iterrows():
         text += f"  {row['ticker']} ({row['entry_date']}): {row['return_pct']}% ({row['exit_type']})\n"
     return text
+
+def get_strategy_health(term='short'):
+    """Compares your REAL closed trades against what the backtest says to expect.
+
+    The gap between the two is your true cost model, measured rather than assumed - it
+    captures slippage, timing and execution that no backtest can know in advance.
+    """
+    from config import GROSS_EDGE_SHORT_PCT, GROSS_EDGE_LONG_PCT, ROUND_TRIP_COST_PCT
+    from decay_monitor import cusum
+
+    df = _load_log()
+    closed = df[(df['status'] == 'closed') & (df['term'] == term)].copy()
+    closed['return_pct'] = pd.to_numeric(closed['return_pct'], errors='coerce')
+    closed = closed[closed['return_pct'].notna()]
+    closed = closed.iloc[_parse_date(closed['entry_date']).argsort()]  # chronological
+
+    gross = GROSS_EDGE_SHORT_PCT if term == 'short' else GROSS_EDGE_LONG_PCT
+    expected = gross - ROUND_TRIP_COST_PCT
+    n = len(closed)
+    if n == 0:
+        return (f"No closed {term}-term trades logged yet. Expected net is {expected:+.2f}%/trade "
+                f"once you have a track record to compare against.")
+
+    realised = closed['return_pct'].astype(float)
+    text = (f"Strategy health, {term}-term ({n} closed trade(s)):\n"
+            f"  expected net/trade (backtest): {expected:+.2f}%\n"
+            f"  your realised net/trade      : {realised.mean():+.2f}%\n"
+            f"  gap (execution + slippage)   : {realised.mean() - expected:+.2f}%\n")
+
+    if n < 30:
+        text += (f"  ⚠️ {n} trades is far too few to judge anything. At least ~30 closed trades are "
+                 f"needed before the gap or any decay signal means much.\n")
+    else:
+        cu = cusum(realised.values, expected_mean=expected)
+        text += (f"  decay alarm: {'RAISED' if cu['alarm'] else 'not raised'} "
+                 f"({cu['pct_of_threshold']:.0f}% of trigger)\n")
+        if cu['alarm']:
+            text += ("  ⚠️ Realised returns have fallen persistently below expectation. Review before "
+                     "adding new positions.\n")
+    text += ("\nSeparately, the 5-year backtest shows the edge was NOT detectable in the most recent "
+             "12 months (the random-entry control fell too, so it may be a hard market rather than a "
+             "broken signal - one period cannot tell). Size accordingly.\n")
+    return text
+
+
+def check_exit_signals():
+    """Checks every open position against the validated exit rule (stop/target/time) plus early-warning context."""
+    df = _load_log()
+    open_trades = df[df['status'] == 'open']
+    if len(open_trades) == 0:
+        return "No open positions to check."
+
+    results = []
+    for _, row in open_trades.iterrows():
+        ticker = row['ticker']
+        term = row['term']
+        entry_date = _parse_date(row['entry_date'])
+        if pd.isna(entry_date):
+            results.append({'ticker': ticker, 'term': term, 'error': f"Unparseable entry_date: {row['entry_date']!r}"})
+            continue
+        days_held = int(np.busday_count(entry_date.date(), datetime.now().date()))
+        horizon = SHORT_HORIZON_DAYS if term == 'short' else LONG_HORIZON_DAYS
+
+        results.append({
+            'ticker': ticker, 'term': term, 'days_held': days_held, 'horizon': horizon,
+            'entry_price': row['entry_price'], 'stop_loss': row['stop_loss'], 'target': row['target'],
+        })
+    return results
