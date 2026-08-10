@@ -6,7 +6,7 @@ from datetime import datetime
 from data_fetcher import get_live_price
 from data_fetcher_long import get_fundamentals
 from trade_journal import (check_exit_signals, log_trade_entry, log_trade_exit, get_open_positions,
-                           get_similar_past_trades, get_strategy_health)
+                           get_similar_past_trades, get_strategy_health, discipline_check)
 from cache_manager import (
     load_sector_rs_cache, load_market_breadth_cache, load_vix_cache, load_corp_announcements_cache,
     load_price_cache_short, load_price_cache_long, load_bulk_deals_cache,
@@ -127,12 +127,17 @@ def get_news(ticker, max_headlines=3):
 
 # ============= SHORT-TERM (4-6 day) =============
 
-def get_swing_levels_short(ticker):
-    price_cache = load_price_cache_short()
-    if ticker not in price_cache:
-        raise ValueError(f"{ticker} not found in short-term cache - run refresh_cache.py")
+def get_swing_levels_short(ticker, stock_df=None):
+    """stock_df lets a caller supply a freshly-downloaded frame for a ticker that is not in
+    the cached 748-stock universe. Same computation either way - the alternative was a second
+    copy of this function that would drift out of sync with it."""
+    if stock_df is None:
+        price_cache = load_price_cache_short()
+        if ticker not in price_cache:
+            raise ValueError(f"{ticker} not found in short-term cache - run refresh_cache.py")
+        stock_df = price_cache[ticker]
 
-    stock_df = price_cache[ticker].dropna(subset=SHORT_FEATURE_COLUMNS)
+    stock_df = stock_df.dropna(subset=SHORT_FEATURE_COLUMNS)
     if len(stock_df) == 0:
         raise ValueError(f"{ticker} has no valid rows")
 
@@ -215,12 +220,17 @@ def get_snapshot_text_short(ticker):
 
 # ============= LONG-TERM (1 month) =============
 
-def get_swing_levels_long(ticker):
-    price_cache = load_price_cache_long()
-    if ticker not in price_cache:
-        raise ValueError(f"{ticker} not found in long-term cache - run refresh_cache.py")
+def get_swing_levels_long(ticker, stock_df=None):
+    """stock_df lets a caller supply a truncated frame to reconstruct the signal state as of
+    an earlier date - needed when logging a trade that was entered days ago, since the journal
+    is meant to freeze the signals AT ENTRY, not today's."""
+    if stock_df is None:
+        price_cache = load_price_cache_long()
+        if ticker not in price_cache:
+            raise ValueError(f"{ticker} not found in long-term cache - run refresh_cache.py")
+        stock_df = price_cache[ticker]
 
-    stock_df = price_cache[ticker].dropna(subset=LONG_FEATURE_COLUMNS)
+    stock_df = stock_df.dropna(subset=LONG_FEATURE_COLUMNS)
     if len(stock_df) == 0:
         raise ValueError(f"{ticker} has no valid rows")
 
@@ -504,11 +514,157 @@ _COUNT_BANDS = [
 ]
 
 
+# The one validated finding from the 369k-filing news archive (news_event_results.md).
+# Stocks that announce dilution underperform a random-entry control for at least a week:
+# measured over 1,391 events, 2021-2026, day-clustered, at the 6-day horizon this strategy
+# actually trades - edge -0.29%/trade, z_paired -3.34, and stable across 3 to 7 days (-2.57 to
+# -3.40). It is the ONLY result in that study that survives correcting for 24 comparisons.
+# Direction is not predictable from most filings; this one is the exception, and it says AVOID.
+DILUTION_KEYWORDS = ['qip', 'qualified institutional', 'preferential issue',
+                     'preferential allotment', 'rights issue', 'fund raising', 'fund-raising']
+DILUTION_LOOKBACK_DAYS = 7
+
+
+def recent_dilution(ticker):
+    """(bool, detail) - did this stock announce dilution in the last week?
+
+    Reads the corporate-announcements cache the daily refresh already maintains, so this costs
+    nothing extra at scan time.
+    """
+    symbol = (ticker or '').replace('.NS', '').strip().upper()
+    try:
+        df = load_corp_announcements_cache()
+    except Exception:
+        return False, None
+    if df is None or len(df) == 0 or 'symbol' not in df:
+        return False, None
+
+    hits = df[df['symbol'].astype(str).str.upper() == symbol]
+    for _, row in hits.iterrows():
+        blob = f"{row.get('desc') or ''} {row.get('attchmntText') or ''}".lower()
+        if any(kw in blob for kw in DILUTION_KEYWORDS):
+            try:
+                when = datetime.strptime(str(row['an_dt'])[:11], '%d-%b-%Y')
+                if (datetime.now() - when).days > DILUTION_LOOKBACK_DAYS:
+                    continue
+                stamp = f"{when:%d-%b}"
+            except Exception:
+                stamp = str(row.get('an_dt'))[:11]
+            return True, f"{stamp}: {row.get('desc')}"
+    return False, None
+
+
+def setup_checklist(row, n_candidates=None):
+    """Applies the documented read-the-scan rules to one candidate and returns a verdict.
+
+    Every one of these was already computed and printed as prose, leaving the user to apply
+    the thresholds by hand every morning. Nothing new is measured here - this only states the
+    pass/fail the numbers already imply, so the rules cannot be silently forgotten.
+
+    Returns (rows, verdict) where rows is [(check, 'PASS'|'WEAK'|'FAIL', detail)].
+    """
+    checks = []
+
+    if n_candidates is not None:
+        hist, label = candidate_band(n_candidates)
+        state = 'PASS' if n_candidates >= 11 else 'FAIL'
+        checks.append(("Market conditions", state,
+                       f"{n_candidates} candidates today, historical {hist}/trade ({label.split(' - ')[0]})"))
+
+    cap = row.get('cap_bucket', 'Unknown')
+    if cap == 'Small':
+        checks.append(("Cap tier", 'PASS', "Small-cap, holds day-clustered (z 2.74)"))
+    elif cap == 'Mid':
+        checks.append(("Cap tier", 'WEAK', "Mid-cap, no longer demonstrated (z 1.73)"))
+    else:
+        checks.append(("Cap tier", 'FAIL', f"{cap}, outside the validated Mid/Small universe"))
+
+    tier = row.get('trend_tier', 'Unknown')
+    if tier == 'Flat/Mild':
+        checks.append(("Trend tier", 'PASS', "Flat/Mild, most reliable tier (z 4.41)"))
+    elif tier == 'Uptrend':
+        checks.append(("Trend tier", 'PASS', "Uptrend, highest return but fewer days (z 2.05)"))
+    elif tier == 'Downtrend':
+        checks.append(("Trend tier", 'FAIL', "Downtrend, not distinguishable from random (z 0.71)"))
+    else:
+        checks.append(("Trend tier", 'WEAK', "trend tier unknown"))
+
+    mp = row.get('meta_win_prob')
+    if mp is None or pd.isna(mp):
+        checks.append(("P(win)", 'WEAK', "unavailable - no opinion, NOT a low score"))
+    elif mp < META_MIN_TRADEABLE:
+        checks.append(("P(win)", 'FAIL', f"{mp*100:.0f}%, below the {META_MIN_TRADEABLE*100:.0f}% floor - "
+                                         f"negative measured EV, not merely weak"))
+    else:
+        checks.append(("P(win)", 'PASS', f"{mp*100:.0f}%, above the tradeable floor"))
+
+    ev = row.get('net_ev_pct')
+    if ev is None or pd.isna(ev):
+        checks.append(("Net expected value", 'WEAK', "not computable"))
+    elif ev <= 0:
+        checks.append(("Net expected value", 'FAIL', f"{ev:+.2f}%/trade after costs"))
+    else:
+        checks.append(("Net expected value", 'PASS', f"{ev:+.2f}%/trade after costs"))
+
+    rsi = row.get('rsi')
+    if rsi is None or pd.isna(rsi):
+        checks.append(("Oversold depth", 'WEAK', "RSI unavailable"))
+    elif rsi < 26:
+        checks.append(("Oversold depth", 'PASS', f"RSI {rsi}, deep (<24 band earned +1.17%/trade)"))
+    elif rsi < 30:
+        checks.append(("Oversold depth", 'WEAK', f"RSI {rsi}, shallow end (28-30 earned +0.27%)"))
+    else:
+        checks.append(("Oversold depth", 'FAIL', f"RSI {rsi}, not oversold"))
+
+    turn = row.get('turnover_60d_cr')
+    floor_cr = MIN_TURNOVER_INR / 1e7
+    if turn is None or pd.isna(turn):
+        checks.append(("Liquidity", 'WEAK', "turnover unavailable"))
+    elif turn < floor_cr:
+        checks.append(("Liquidity", 'FAIL', f"Rs{turn}cr/day, below the Rs{floor_cr:.0f}cr floor"))
+    else:
+        checks.append(("Liquidity", 'PASS', f"Rs{turn}cr/day, above the floor"))
+
+    diluted, detail = recent_dilution(row.get('ticker'))
+    if diluted:
+        checks.append(("Recent dilution", 'FAIL',
+                       f"{detail} - dilution events underperform by -0.29%/trade over 6 days "
+                       f"(z_paired -3.34, n=1391)"))
+    else:
+        checks.append(("Recent dilution", 'PASS',
+                       f"no fund-raising filing in the last {DILUTION_LOOKBACK_DAYS} days"))
+
+    fails = [c for c in checks if c[1] == 'FAIL']
+    weaks = [c for c in checks if c[1] == 'WEAK']
+    if fails:
+        verdict = (f"DOES NOT CLEAR - fails {len(fails)} check(s): "
+                   f"{', '.join(c[0].lower() for c in fails)}. The measured edge does not cover "
+                   f"this setup.")
+    elif weaks:
+        verdict = (f"CLEARS, WITH {len(weaks)} SOFT SPOT(S): "
+                   f"{', '.join(c[0].lower() for c in weaks)}. Tradeable on the rules, but not "
+                   f"the strongest version of this setup.")
+    else:
+        verdict = ("CLEARS EVERY CHECK - this is what the validated setup looks like. Still size "
+                   "it normally: the strategy as a whole has been flat for 12 months.")
+    return checks, verdict
+
+
+def format_checklist(row, n_candidates=None, indent="    "):
+    checks, verdict = setup_checklist(row, n_candidates)
+    mark = {'PASS': '[PASS]', 'WEAK': '[WEAK]', 'FAIL': '[FAIL]'}
+    lines = [f"{indent}--- setup checklist ---"]
+    for name, state, detail in checks:
+        lines.append(f"{indent}{mark[state]:<7}{name:<20}{detail}")
+    lines.append(f"{indent}>> {verdict}")
+    return "\n".join(lines) + "\n"
+
+
 def candidate_count_note(n):
     """Reports how many names triggered today. Free context, and the strongest single predictor
     of absolute return measured on this universe - but it is mostly market beta, so it is
     labelled as conditions rather than as setup quality."""
-    hist, label = next((h, l) for cut, h, l in _COUNT_BANDS if n <= cut)
+    hist, label = candidate_band(n)
     return (f"MARKET CONDITIONS: {n} candidate(s) passed the filter today - {label}.\n"
             f"  Historical mean {hist}/trade on days with this many candidates (5y, net of costs).\n"
             f"  This reflects the MARKET, not the quality of the setups below: random entries show "
@@ -623,6 +779,7 @@ def scan_watchlist_text_short(limit=30, rsi_threshold=30):
                  f"RSI {row['rsi']}, Stop ₹{row['stop_loss']}, Target ₹{row['target']}{spike_flag}{unval_flag}\n"
                  f"    liquidity {turn} | round-trip cost {row['round_trip_cost_pct']}% | "
                  f"NET expected value {row['net_ev_pct']:+.2f}%/trade{meta}\n")
+        text += format_checklist(row, n_candidates=len(df))
     if excluded_illiquid:
         text += (f"\n{excluded_illiquid} candidate(s) excluded: daily turnover below ₹{MIN_TURNOVER_INR/1e7:.0f}cr, where "
                  f"impact costs exceed the measured edge. VALIDATED: 5-fold walk-forward, beat the unfiltered "
@@ -684,6 +841,21 @@ def calculate_position_size(ticker, total_capital, risk_pct=DEFAULT_RISK_PCT, te
                        f"If they confirm, call this tool again with confirmed=true.")
         }
 
+    # Discipline layer. Behavioural, not predictive - these read the user's own trade log and
+    # constrain the trader rather than forecasting the trade, which is why they carry no
+    # backtest. Warnings ride along with a successful sizing; blocks behave like the other
+    # gates above and need confirmed=true.
+    discipline = discipline_check(ticker, risk_pct)
+    if discipline['blocks'] and not confirmed:
+        return {
+            'blocked': True,
+            'reason': " ".join(discipline['blocks']) +
+                      " Position sizing was NOT calculated. Put this to the user in their own "
+                      "words and ask whether they still want to proceed; if they confirm, call "
+                      "again with confirmed=true.",
+            'discipline_warnings': discipline['warnings'],
+        }
+
     # Market-volatility regime scaling. Only applies to short-term mean reversion, where the
     # regime dependence was measured; the long-term momentum signal was not tested for this.
     vol_note, vol_mult = None, 1.0
@@ -717,12 +889,40 @@ def calculate_position_size(ticker, total_capital, risk_pct=DEFAULT_RISK_PCT, te
     position_value = shares_to_buy * entry_price
     actual_risk_amount = shares_to_buy * risk_per_share
 
+    # A bare shares_to_buy=0 used to go back with no explanation, and the agent would invent
+    # one - usually "this is a bad trade". It is not a statement about the setup at all: it
+    # means this ACCOUNT cannot hold one share at this risk %. Those are different questions
+    # and blending them turns an account-size fact into a false verdict on the stock.
+    if shares_to_buy == 0:
+        need_for_risk = risk_per_share / (effective_risk_pct / 100) if effective_risk_pct else None
+        min_capital = max(need_for_risk or 0, entry_price)
+        return {
+            'ticker': ticker, 'shares_to_buy': 0,
+            'sizing_only_constraint': True,
+            'entry_price': entry_price, 'stop_loss': stop_loss,
+            'risk_per_share': round(risk_per_share, 2),
+            'total_capital': total_capital,
+            'risk_pct_after_regime_scaling': round(effective_risk_pct, 3),
+            'minimum_capital_for_one_share': round(min_capital, 0),
+            'reason': (
+                f"ACCOUNT SIZE ONLY - this says NOTHING about whether {ticker} is a good setup. "
+                f"One share risks Rs{risk_per_share:.2f} to the stop, but Rs{total_capital:,.0f} "
+                f"at {effective_risk_pct:.2f}% risk only allows Rs{risk_amount:.2f} of risk. "
+                f"You would need about Rs{min_capital:,.0f} to take one share at this risk "
+                f"level, or a wider risk % / a stock with a tighter stop. "
+                f"Report the setup quality separately and do NOT downgrade the analysis "
+                f"because of this number."),
+        }
+
     return {
         'ticker': ticker, 'term': term, 'entry_price': entry_price, 'stop_loss': stop_loss,
         'risk_per_share': round(risk_per_share, 2), 'total_capital': total_capital,
         'risk_pct_requested': risk_pct,
         'risk_pct_after_regime_scaling': round(effective_risk_pct, 3),
         'vol_regime_multiplier': vol_mult, 'vol_regime_note': vol_note,
+        # Behavioural flags from the user's own log - relay these verbatim, they are not
+        # predictions and must not be presented as reasons the trade will lose.
+        'discipline_warnings': discipline['warnings'],
         'shares_to_buy': shares_to_buy, 'position_value': round(position_value, 2),
         'position_pct_of_capital': round((position_value / total_capital) * 100, 2),
         'actual_risk_amount': round(actual_risk_amount, 2),
@@ -765,6 +965,147 @@ def get_full_analysis(ticker, term="short"):
     return "\n---\n".join(parts)
 
 
+def normalize_ticker(raw):
+    """'reliance' / 'RELIANCE' / 'reliance.ns' -> 'RELIANCE.NS'. Users type tickers casually;
+    without this every such message became a cache miss, and a tool erroring out in front of a
+    waiting user is exactly where the agent starts inventing facts."""
+    t = (raw or '').strip().upper().replace(' ', '')
+    if not t:
+        return None
+    for suffix in ('.NS', '.BO'):
+        if t.endswith(suffix):
+            return t
+    return t + '.NS'
+
+
+def _levels_any_ticker(ticker):
+    """(levels, source). Falls back to a live download for tickers outside the cached universe.
+
+    Returns source='cache' | 'live', or raises with a plain message. It must never return
+    silently-empty data - a missing number here is what the agent fills in from its own
+    weights.
+    """
+    try:
+        return get_swing_levels_short(ticker), 'cache'
+    except Exception:
+        pass
+
+    import yfinance as yf
+    from features import add_short_features, MIN_BARS
+    df = yf.download(ticker, period="2y", interval="1d", progress=False, auto_adjust=True)
+    if df is None or len(df) < MIN_BARS:
+        raise ValueError(
+            f"No usable price history for {ticker}. Either the symbol is wrong or it is not on "
+            f"Yahoo Finance. Nothing below is computed - do not guess values for it.")
+    if hasattr(df.columns, 'get_level_values'):
+        df.columns = df.columns.get_level_values(0)
+    df = df.reset_index()
+    df.columns = [str(c).lower() for c in df.columns]
+    return get_swing_levels_short(ticker, stock_df=add_short_features(df)), 'live'
+
+
+def _universe_verdict(ticker, levels, source):
+    """Says plainly whether the backtested edge covers this setup. The tool previously had no
+    way to express 'no opinion', so an out-of-universe stock still got a confident-sounding
+    answer assembled from tools that did not apply to it."""
+    cap = levels.get('cap_bucket', 'Unknown')
+    rsi = levels.get('rsi')
+    turn_cr = levels.get('turnover_60d_cr')
+    fails = []
+    if source == 'live':
+        fails.append("not in the 748-stock universe (fetched live, no cap-tier or model data)")
+    if cap not in ('Mid', 'Small'):
+        fails.append(f"cap tier is {cap}, and the edge was only demonstrated in Mid/Small")
+    if rsi is None or rsi >= 30:
+        fails.append(f"RSI is {rsi}, not below 30 - this is not a mean-reversion setup")
+    if turn_cr is not None and turn_cr * 1e7 < MIN_TURNOVER_INR:
+        fails.append(f"turnover Rs{turn_cr}cr/day is below the Rs{MIN_TURNOVER_INR/1e7:.0f}cr "
+                     f"floor, where impact costs exceed the measured edge")
+    if cap == 'Mid':
+        fails.append("Mid-cap is no longer demonstrated day-clustered (z 1.73)")
+    if levels.get('trend_tier') == 'Downtrend':
+        fails.append("Downtrend tier no longer clears the random-entry control (z 0.71)")
+
+    if not fails:
+        return ("VALIDATED SETUP: this matches the backtested short-term strategy "
+                "(RSI<30, Mid/Small, above the liquidity floor). The statistics below apply.\n")
+    bullets = "".join(f"  - {f}\n" for f in fails)
+    return ("NO BACKTESTED EDGE APPLIES TO THIS SETUP.\n" + bullets +
+            "Everything below is REAL DATA about this stock, but it is not a validated signal. "
+            "Do not present any expected-value or z-score figure as if it covered this trade, "
+            "and do not imply the backtest endorses it.\n")
+
+
+def evaluate_user_trade(ticker, entry_price=None, shares=None):
+    """Evaluates a stock the USER chose, optionally one they have already entered.
+
+    The scan-driven tools all assume the system picked the stock and that the user has no
+    position yet. When a user says 'I bought 5 of XYZ at 400' there was previously nowhere to
+    put the 400, no path for a ticker outside the cache, and no way to say the strategy has no
+    opinion - so the agent improvised. This handles all three explicitly.
+    """
+    ticker = normalize_ticker(ticker)
+    if not ticker:
+        return "No ticker given. Tell me the symbol, e.g. 'RELIANCE' or 'RELIANCE.NS'."
+
+    entry_price = parse_number(entry_price)
+    shares = parse_number(shares)
+
+    try:
+        levels, source = _levels_any_ticker(ticker)
+    except Exception as e:
+        return f"{ticker}: {e}"
+
+    live = get_live_price(ticker)
+    price_now = live if live is not None else levels['current_price']
+    price_label = "live" if live is not None else "last close (live quote unavailable)"
+    atr = levels['atr']
+
+    out = [f"USER-SELECTED TRADE REVIEW - {ticker}", ""]
+    out.append(_universe_verdict(ticker, levels, source))
+    out.append(f"Price now: Rs{price_now} ({price_label}) | RSI {levels['rsi']} | "
+               f"ATR Rs{atr} ({levels['atr_pct']}%) | "
+               f"1yr {levels.get('change_1yr_pct')}% [{levels.get('trend_tier')}]")
+    if source == 'cache':
+        out.append(f"Cap tier: {levels.get('cap_bucket')} | liquidity "
+                   f"{levels.get('turnover_60d_cr')}cr/day | "
+                   f"round-trip cost {levels.get('round_trip_cost_pct')}%")
+
+    if entry_price is not None and entry_price > 0:
+        pnl = (price_now - entry_price) / entry_price * 100
+        stop = entry_price - 2 * atr
+        t1, t2 = entry_price + 2 * atr, entry_price + 3.5 * atr
+        rr = (t1 - entry_price) / (entry_price - stop) if entry_price > stop else 0
+        out += ["",
+                f"AGAINST YOUR ENTRY of Rs{entry_price}:",
+                f"  Unrealised: {pnl:+.2f}%",
+                f"  Stop (2xATR from YOUR entry): Rs{round(stop, 2)}  "
+                f"({(stop - price_now) / price_now * 100:+.1f}% from here)",
+                f"  Target 1 (2xATR): Rs{round(t1, 2)} | Target 2 (3.5xATR): Rs{round(t2, 2)}",
+                f"  Reward:risk at target 1: {rr:.2f} : 1"]
+        if price_now <= stop:
+            out.append("  ALREADY BELOW THE STOP - the validated exit rule says this trade is out.")
+        if shares is not None and shares > 0:
+            risk = (entry_price - stop) * shares
+            out.append(f"  Position: {int(shares)} shares, Rs{round(entry_price * shares, 2)} "
+                       f"invested, Rs{round(risk, 2)} at risk to the stop "
+                       f"(tell me your capital and I can check that against your risk %).")
+    else:
+        stop = price_now - 2 * atr
+        out += ["",
+                f"IF ENTERING NOW at Rs{price_now}: stop Rs{round(stop, 2)}, "
+                f"target 1 Rs{round(price_now + 2 * atr, 2)}, "
+                f"target 2 Rs{round(price_now + 3.5 * atr, 2)} (2x/3.5x ATR)"]
+
+    if source == 'cache':
+        out += ["", "--- full checklist ---", get_full_analysis(ticker, term="short")]
+    else:
+        out += ["", f"{ticker} is outside the cached universe, so fundamentals, institutional "
+                    f"activity, results calendar and announcements were NOT retrieved. State that "
+                    f"they are unavailable rather than describing the company from memory."]
+    return "\n".join(out)
+
+
 def get_catalyst_scan_text(limit=15):
     """UNVALIDATED, informational only - flags stocks with unusual volume, for the agent to then
     check news on. Cannot be backtested (no historical news archive available)."""
@@ -789,6 +1130,59 @@ def get_catalyst_scan_text(limit=15):
     text += "\nFor any of these, check news headlines to see if there's a real catalyst behind the volume.\n"
     return text
 
+def exit_verdict(current, stop, target, days_held, horizon):
+    """The validated exit rule, as structured data: ('stop'|'target'|'time'|'hold', message).
+
+    Shared by get_exit_check_text and alert_watcher. A second copy of these comparisons living
+    in the watcher is how the alert and the on-demand check would eventually disagree about
+    whether a position is out.
+    """
+    if current <= stop:
+        return 'stop', "EXIT NOW - price has hit/breached your stop-loss (validated rule)."
+    if current >= target:
+        return 'target', "EXIT NOW - price has hit/exceeded your target (validated rule)."
+    if days_held >= horizon:
+        return 'time', ("EXIT NOW - holding period expired without hitting stop or target "
+                        "(validated time-exit rule).")
+    return 'hold', "HOLD - within horizon, no stop/target hit, original setup still intact."
+
+
+def candidate_band(n):
+    """(historical mean net/trade, label) for a day with n candidates. See _COUNT_BANDS."""
+    return next((h, l) for cut, h, l in _COUNT_BANDS if n <= cut)
+
+
+def count_candidates(rsi_threshold=30):
+    """Fast count of stocks currently passing the entry filter - no snapshots, no model scoring.
+
+    Used by the alert watcher, which needs the number many times a day and not the detail. May
+    differ by a name or two from the full scan, which also drops tickers whose snapshot fails.
+    """
+    try:
+        cache = load_price_cache_short()
+    except Exception:
+        return None
+    n = 0
+    for ticker, df in cache.items():
+        # Mid/Small only. The concentration bands were measured on that universe, so counting
+        # large-caps here would compare today's number against thresholds from a different
+        # population - the scan excludes them too.
+        if CAP_BUCKET_MAP.get(ticker) not in ('Mid', 'Small'):
+            continue
+        valid = df.dropna(subset=SHORT_FEATURE_COLUMNS)
+        if len(valid) == 0:
+            continue
+        latest = valid.iloc[-1]
+        if latest['rsi'] >= rsi_threshold:
+            continue
+        turn = latest.get('turnover_60d')
+        # Unknown turnover counts as FAILING, matching the scan, which excludes illiquid names.
+        if turn is None or pd.isna(turn) or turn < MIN_TURNOVER_INR:
+            continue
+        n += 1
+    return n
+
+
 def get_exit_check_text():
     positions = check_exit_signals()
     if isinstance(positions, str):
@@ -810,12 +1204,9 @@ def get_exit_check_text():
 
             text += f"{pos['ticker']} ({pos['term']}, day {pos['days_held']}/{pos['horizon']}): Current ₹{current}, Entry ₹{pos['entry_price']}, Stop ₹{stop}, Target ₹{target}\n"
 
-            if current <= stop:
-                text += "  VERDICT: EXIT NOW - price has hit/breached your stop-loss (validated rule).\n"
-            elif current >= target:
-                text += "  VERDICT: EXIT NOW - price has hit/exceeded your target (validated rule).\n"
-            elif pos['days_held'] >= pos['horizon']:
-                text += "  VERDICT: EXIT NOW - holding period expired without hitting stop or target (validated time-exit rule).\n"
+            code, verdict = exit_verdict(current, stop, target, pos['days_held'], pos['horizon'])
+            if code != 'hold':
+                text += f"  VERDICT: {verdict}\n"
             else:
                 if pos['term'] == 'short' and levels['rsi'] > 60:
                     text += f"  CAUTION (unvalidated, informational only): RSI has risen to {levels['rsi']} - the oversold condition that triggered this trade no longer holds. Still technically HOLD per the validated rule, but momentum may be fading.\n"
@@ -1091,6 +1482,28 @@ TOOL_DEFINITIONS = [
         "parameters": {"type": "object", "properties": {"term": {"type": "string", "enum": ["short", "long"]}}}
     }},
     {"type": "function", "function": {
+        "name": "evaluate_user_trade",
+        "description": (
+            "USE THIS whenever the user names a stock THEY are interested in or have already bought, "
+            "rather than one the scan surfaced - e.g. 'I bought 5 shares of XYZ at 400', 'what do you "
+            "think of ABC', 'is RELIANCE a good buy'. Works for ANY NSE ticker including ones outside "
+            "the 748-stock universe. Pass entry_price and shares whenever the user mentions them. "
+            "It states explicitly whether the backtested edge applies to the setup - when it says no "
+            "edge applies, relay that clearly and do NOT quote strategy statistics as if they covered "
+            "this trade."),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "ticker": {"type": "string"},
+                "entry_price": {"type": ["number", "string", "object"],
+                                "description": "The user's own entry price, if they gave one."},
+                "shares": {"type": ["number", "string", "object"],
+                           "description": "Number of shares the user holds or plans to buy, if given."}
+            },
+            "required": ["ticker"]
+        }
+    }},
+    {"type": "function", "function": {
         "name": "calculate_position_size",
         "description": "Calculates shares to buy given capital and risk %. Will BLOCK and return a warning instead of sizing if risk_pct exceeds 2%, or if the stock has an extreme/parabolic move flag (long-term only) - requires confirmed=true to override after explicitly asking the user. ticker is REQUIRED and must be a real stock symbol - if the user hasn't named a specific stock, scan first to find one before calling this.",
         "parameters": {
@@ -1161,6 +1574,11 @@ def execute_tool(function_name, function_args):
         return check_upcoming_results(function_args['ticker'])
     elif function_name == "get_strategy_health_text":
         return get_strategy_health(function_args.get('term', 'short'))
+    elif function_name == "evaluate_user_trade":
+        return evaluate_user_trade(
+            function_args.get('ticker', ''),
+            parse_number(function_args.get('entry_price')),
+            parse_number(function_args.get('shares')))
     elif function_name == "calculate_position_size":
         confirmed = parse_bool(function_args.get('confirmed', False), default=False)
         total_capital = parse_number(function_args.get('total_capital'), default=DEFAULT_CAPITAL)

@@ -1,102 +1,114 @@
-\# NSE Trading Assistant — Claude Code Instructions
+# NSE Trading Assistant — instructions for AI agents
 
+Read `README.md` for strategy detail and `HANDOFF.md` for where the project currently stands.
+This file is about *how to work on the code* without breaking it or reintroducing errors that
+have already been paid for.
 
+---
 
-\## Commands
+## The one thing to understand about this project
 
-\- Refresh data: `python refresh\_cache.py` (takes several minutes, downloads 748 stocks)
+**Every claim here is measured, and several confident-sounding claims have already been proven
+wrong by the project's own data.** Three separate times a result that looked strong collapsed
+under better statistics:
 
-\- Run CLI: `python main.py`
+1. **Overlapping trades** (2026-07) — RSI stays <30 for days, so one episode was counted as ~3.4
+   near-identical trades. Deflated every z-score by ~1.7x.
+2. **Day-clustering** (2026-08) — trades on the *same day across different stocks* share one
+   market factor. Small-cap z went 12.06 → 7.03 → **2.74**. Mid-cap and the Downtrend tier stopped
+   being demonstrable entirely.
+3. **Naive vs paired inference** — `open_offer` news events showed naive z=7.17 and paired z=0.44.
+   The naive number was high only because the *control* was also losing.
 
-\- Run Streamlit: `streamlit run app.py`
+So: **never present a number without saying how it was measured.** If you find yourself about to
+say "this clearly works", that is the exact moment the project has historically been wrong.
 
-\- Test a single script: activate venv first — `venv\\Scripts\\activate`
+---
 
+## Non-negotiable discipline
 
+- **Backtest before adopting.** Every signal/filter idea gets tested against a random-entry
+  control using `backtest_engine.py` before it touches a live tool. No exceptions, no
+  "obviously right" rules. See the REJECTED table in `README.md` — most obvious ideas failed.
+- **Use `day_clustered_edge`, not just `edge_vs_control`.** Trade-level z-scores are misleading
+  for anything that selects days or fires broadly. `z_paired` is the headline number.
+- **Entry timing must be realistic.** For event studies, entry is the *next session's open*,
+  never the pre-news close. Anything else is look-ahead.
+- **Never let the agent state a fact not traceable to a tool result.** Enforced via
+  `SHARED_RULES` in `config.py`, which both `agent.py` and `mcp_server.py` import — edit it in
+  one place and all interfaces update.
+- **XGBoost return-predictors score R² ≈ 0.** They are displayed as a de-emphasised data point
+  and must never drive logic. `meta_label.py` (P(win)) replaced them and is the real signal.
 
-\## Critical: three interfaces, three restart behaviors
+---
 
-\- `main.py` (CLI): re-reads all code fresh every run. Safe to test changes here first.
+## Commands
 
-\- `app.py` (Streamlit): must be manually stopped and restarted after any code change.
+```bash
+python refresh_cache.py          # daily; several minutes, downloads 748 stocks
+python main.py                   # CLI — always picks up latest code
+streamlit run app.py             # needs manual restart after code changes
+python news_watcher.py --once --dry --force   # phone watcher, sends nothing
+```
 
-\- `mcp\_server.py` (Claude Desktop): runs as a persistent background process. Editing
+Tests are plain files, no framework, no network:
+`test_user_trade.py` `test_discipline.py` `test_trade_journal.py` `test_news_watcher.py`
+`test_alert_watcher.py` `test_telegram_bot.py` `test_category_flows.py`
+plus `python backtest_engine.py` (self-check).
 
-&#x20; `tools.py`/`cache\_manager.py`/`data\_fetcher\*.py` has NO effect until Claude Desktop is
+On Windows use `PYTHONIOENCODING=utf-8` or ₹ symbols crash the console.
 
-&#x20; fully quit (system tray → Quit, not window close) and reopened.
+---
 
-When testing a fix, always verify via CLI first — it's the fastest signal.
+## Three interfaces, three restart behaviours
 
+- `main.py` (CLI) — re-reads everything each run. **Test fixes here first, it is the fastest signal.**
+- `app.py` (Streamlit) — must be manually stopped and restarted after any code change.
+- `mcp_server.py` (Claude Desktop) — persistent background process. Needs a full **system-tray
+  quit**, not a window close. Editing `tools.py` has zero effect until then.
 
+---
 
-\## Recurring bug patterns in this codebase — check these first
+## Recurring bugs — check these first
 
-1\. \*\*Duplicate function/tool definitions.\*\* `tools.py` has been patched many times;
+1. **Duplicate function definitions.** `tools.py` has been patched many times; functions have
+   ended up defined twice with the stale copy silently winning. If a fix "doesn't take effect",
+   grep for duplicate `def` names before assuming the logic is wrong.
+2. **Code inserted before the variable it references.** Sorting/filtering logic must go AFTER
+   `df = pd.DataFrame(...)`. Caused a real `UnboundLocalError`.
+3. **Feature computation lives in `features.py`.** `cache_manager.py` used to have its own
+   duplicated block — any new feature column must appear wherever the cache is built, or it
+   silently won't exist at runtime.
+4. **yfinance period must be long enough.** A 252-day rolling calc needs `period="2y"`, not
+   `"6mo"` — this caused a silent "Unknown" trend tier across the whole scan.
+5. **"possibly delisted" in a refresh is usually rate-limiting**, not delisting. The retry pass
+   recovers them (49/49 recovered in a recent run). Only worry if a ticker fails twice.
+6. **Never duplicate the verdict logic.** `exit_verdict()` and `setup_checklist()` exist so the
+   alert watcher and the on-demand check cannot drift apart. Extract, don't copy.
 
-&#x20;  `scan\_watchlist\_text\_short` and others have previously ended up defined twice, with
+---
 
-&#x20;  the earlier (stale) copy silently winning or causing confusion. If a fix "doesn't
+## Phone deployment constraints (news_watcher.py)
 
-&#x20;  take effect," grep for duplicate `def` names before assuming the logic is wrong.
+Runs on a spare Android under Termux. It deliberately imports **neither pandas nor nsefin, and
+does not import `config.py`** — all three pull pandas, which compiles from source on Android and
+routinely fails. It reads the watchlist with the `csv` module and calls NSE over plain HTTP.
 
-2\. \*\*Code inserted before the variable it references exists.\*\* When adding sorting/filtering
+**If you add an import to `news_watcher.py` or `notify.py`, check it is pure-Python.** The only
+dependencies on the phone are `requests` and `python-dotenv`. `tools.py` is imported lazily
+inside `_context_for()` and allowed to fail, so the phone degrades gracefully.
 
-&#x20;  logic to a function, it must go AFTER the `df = pd.DataFrame(...)` line, not before.
+Deploy: `adb` lives at `~/AppData/Local/Android/Sdk/platform-tools/adb.exe` (not on PATH).
+Set `MSYS_NO_PATHCONV=1` in Git Bash. Push to `/sdcard/Download/`, then `cp` from inside Termux —
+adb cannot write into Termux's private home. `find /sdcard` does not work on that device; use `ls`.
 
-&#x20;  Caused a real `UnboundLocalError` once — check placement carefully.
+---
 
-3\. \*\*Groq/Qwen tool-calling sends malformed types\*\*: numbers as strings (`"30"` not `30`),
+## Tone the user expects
 
-&#x20;  booleans as strings (`"true"`), and sometimes nested objects (`{"limit": {"limit": 10}}`).
+Direct, technically specific, no hedging or flattery. State uncertainty as a number, not a vibe.
+If a result is negative, lead with that. He has repeatedly and explicitly valued being told an
+idea failed over being handed something that merely looks good — several of his own ideas have
+been measured and rejected in this repo, and that is treated as the system working.
 
-&#x20;  All numeric/boolean tool parameters MUST use `"type": \["number","string","object"]` /
-
-&#x20;  `\["boolean","string"]` in TOOL\_DEFINITIONS, and be passed through `parse\_number()` /
-
-&#x20;  `parse\_bool()` in `execute\_tool` before use. This is NOT needed in `mcp\_server.py` —
-
-&#x20;  Claude's own MCP client sends properly typed JSON.
-
-4\. \*\*A fix applied to `data\_fetcher.py`'s `add\_features()` does NOT affect the actual cache.\*\*
-
-&#x20;  `cache\_manager.py`'s `refresh\_price\_cache\_short`/`\_long` have their OWN duplicated
-
-&#x20;  feature-computation blocks and do not call `add\_features()`. Any new feature column
-
-&#x20;  must be added in BOTH places, or it silently won't appear in the live cache.
-
-5\. \*\*yfinance download period must be long enough for the feature.\*\* A 252-day (1yr)
-
-&#x20;  rolling calc needs `period="2y"`, not `"6mo"` — this caused a real silent "Unknown"
-
-&#x20;  trend-tier bug across the entire scan.
-
-
-
-\## Non-negotiable project discipline
-
-\- Every new signal/filter idea gets backtested against a random-entry control (see
-
-&#x20; `backtest\_\*.py` files for the pattern) BEFORE being added to a live tool. Never add
-
-&#x20; an untested "seems obviously right" rule — we've been wrong about "obvious" before
-
-&#x20; (see README: shallow-pullback hypothesis was rejected by real data).
-
-\- Never let the agent state a specific fact (price, news, business description) not
-
-&#x20; traceable to an actual tool result. This is enforced via SYSTEM\_PROMPT in agent.py
-
-&#x20; and `instructions=` in mcp\_server.py's FastMCP() — keep both in sync when adding rules.
-
-\- Model (XGBoost) signals are proven weak (R² ≈ 0) — never let them drive logic beyond
-
-&#x20; being displayed as a labeled, de-emphasized data point.
-
-
-
-\## Full project context
-
-See @README.md for the complete strategy tables, architecture, and feature list.
-
+Do not volunteer position sizing unless asked; do not assume his capital.

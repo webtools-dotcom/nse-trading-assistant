@@ -17,11 +17,18 @@ SYSTEM_PROMPT = SHARED_RULES
 
 MAX_TOOL_ROUNDS = 12  # safety limit so it can't loop forever
 
+# How many recent user turns get sent to the model. This was 3, sized for Qwen's 8000 TPM
+# free-tier limit on Groq. That provider is no longer used - Gemini Flash Lite has orders of
+# magnitude more headroom - and a 3-turn window actively hurt multi-turn conversations, where
+# the user builds context across several short messages (especially from Telegram). Lower it
+# again only if you move to a genuinely token-constrained provider.
+MAX_HISTORY_TURNS = 12
 
-def build_trimmed_history(full_history, max_turns=3):
-    """Sends only the system prompt + last few user turns to the API - keeps requests under
-    Qwen's small 8000 TPM free-tier limit. Full history is still saved/displayed in full;
-    only what's actually sent to the model each call is trimmed."""
+
+def build_trimmed_history(full_history, max_turns=MAX_HISTORY_TURNS):
+    """Sends the system prompt + the last N user turns to the API, so a long session cannot grow
+    the request without bound. Full history is still saved and displayed; only what goes to the
+    model each call is trimmed."""
     system_msg = full_history[0]
     rest = full_history[1:]
     user_indices = [i for i, m in enumerate(rest) if m.get('role') == 'user']

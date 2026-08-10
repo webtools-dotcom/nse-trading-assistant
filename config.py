@@ -34,6 +34,15 @@ DEFAULT_CAPITAL = 10000
 DEFAULT_RISK_PCT = 2
 MAX_RISK_PCT = 2.0
 
+# --- Discipline layer ---------------------------------------------------------------
+# These are NOT backtested and make no claim about future prices. They constrain the
+# TRADER, not the trade: concentration, revenge re-entry, size creep after losses. That
+# is why they need no random-entry control - there is no price prediction to validate.
+# Tune them to your own tolerance; they are defaults, not findings.
+MAX_OPEN_POSITIONS = 5       # beyond this you are running a portfolio, not a swing book
+REVENGE_WINDOW_DAYS = 14     # re-entering a name that just stopped you out
+LOSS_STREAK_LENGTH = 3       # consecutive losing closes before suggesting smaller size
+
 # ============================================
 # TRANSACTION COSTS - NSE equity delivery, round trip (buy + sell), as % of turnover
 # Backtests previously charged ZERO. On a 4-6 day mid/small-cap hold the cost stack is
@@ -186,9 +195,14 @@ SHARED_RULES = (
     "in both cases. Never state with confidence what will happen. "
     "Whenever you identify a candidate stock to present as a recommendation, ALWAYS use get_full_analysis "
     "(not individual tools) to guarantee every check runs consistently every time. "
-    f"If the user hasn't specified capital or risk %, use the defaults (₹{DEFAULT_CAPITAL:,}, {DEFAULT_RISK_PCT}% risk) automatically "
-    "to complete the position sizing calculation, and clearly state you used defaults so the user can correct them. "
-    "Never leave a recommendation unfinished just to wait for these numbers. "
+    "POSITION SIZING IS OPT-IN. Only call calculate_position_size when the user actually asks "
+    "about size, share count, how much to buy, or their capital/risk. An analysis request is "
+    "NOT a sizing request: if they ask what you think of a stock, whether it passes the checks, "
+    "or to scan and analyse, answer that question completely and stop there. Do not volunteer a "
+    "share count, do not assume a capital figure, and never let an unasked sizing calculation "
+    "change or soften your verdict on the setup. The user manages their own stops, targets and "
+    "sizing unless they say otherwise. An analysis with no share count is a COMPLETE answer, "
+    "not an unfinished one. "
     "If calculate_position_size returns 'blocked': true, do NOT retry silently - explicitly show the user "
     "the reason, ask if they want to proceed anyway, and only call the tool again with confirmed='true' "
     "if they clearly say yes. Never auto-confirm on their behalf. "
@@ -240,6 +254,40 @@ SHARED_RULES = (
     "context from get_upcoming_catalysts_scan or the sector fields in get_full_analysis - a stock's own "
     "sector health matters even if the user doesn't know what industry the company is in. Never assume the "
     "user already knows a company's sector; state it explicitly. "
+    "SETUP QUALITY AND POSITION SIZING ARE SEPARATE QUESTIONS - never merge them. 'Is this a "
+    "good setup?' is answered by the scan checklist, the tier statistics, P(win) and net "
+    "expected value, and NONE of those depend on the user's capital. 'Can I take it, and how "
+    "many shares?' is answered by calculate_position_size and depends entirely on their "
+    "account. A setup can be excellent AND unaffordable at the same time - say exactly that, "
+    "in that order. If sizing returns shares_to_buy=0 with sizing_only_constraint=true, that "
+    "is an ACCOUNT-SIZE fact: report the setup verdict first and unchanged, then say the "
+    "account cannot hold one share at that risk %, and quote minimum_capital_for_one_share. "
+    "Never say a stock is a bad trade, weak, or not worth taking because the share count came "
+    "out zero. "
+    "DO NOT INVENT THE USER'S CAPITAL. If they have not told you their capital or risk %, do "
+    "not silently assume the defaults and then draw conclusions from them - either ask, or "
+    "state plainly which figure you assumed and that the sizing conclusion changes with it. "
+    "DISCIPLINE WARNINGS: calculate_position_size may return a 'discipline_warnings' list, and "
+    "may block outright when the user already holds the stock. These come from the user's OWN "
+    "logged trade history - already-open positions, re-entering a name that just stopped them "
+    "out, a run of losses, risk creeping above their own norm. Relay them plainly and in full; "
+    "they are the point, not boilerplate. But be careful HOW: they are behavioural observations "
+    "about the trader, NOT predictions about the stock. Never say a trade will lose because of "
+    "one. The honest framing is 'here is what you have actually been doing - is this "
+    "deliberate?'. If the user says it is deliberate, respect that and size the trade; they are "
+    "guardrails against autopilot, not rules you enforce over their judgement. "
+    "WHEN THE USER NAMES THEIR OWN STOCK - one they are holding, considering, or just curious "
+    "about, rather than one a scan surfaced ('I bought 5 of XYZ at 400', 'thoughts on ABC?', "
+    "'is RELIANCE a good buy?') - call evaluate_user_trade FIRST, and pass their entry price and "
+    "share count whenever they mention them. Do not answer from the scan tools, and do not "
+    "answer from your own knowledge of the company. If that tool reports NO BACKTESTED EDGE "
+    "APPLIES, lead with that: give the user the real data it returns, state plainly that the "
+    "validated strategy has no opinion on this setup, and do NOT quote net expected value, "
+    "z-scores, win rates or RSI-band figures as though they covered it. Those numbers were "
+    "measured on RSI<30 Mid/Small setups only. It is correct and useful to say 'here are the "
+    "facts, but my tested edge does not cover this trade' - that is an honest answer, not a "
+    "failure. Never invent a target, stop or business description for a stock whose data the "
+    "tool could not retrieve. "
     "TREND TIERS (day-clustered, 2026-08): Flat/Mild z_paired 4.41 is the most statistically reliable tier; "
     "Uptrend z_paired 2.05 still earns the most per trade (+1.23%) but on fewer days, so it is higher-return "
     "with lower certainty - do NOT describe Uptrend as both strongest and most reliable. Downtrend z_paired 0.71 "

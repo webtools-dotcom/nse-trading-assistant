@@ -52,7 +52,8 @@ Datamatics Global Services Ltd.,Information Technology,DATAMATICS,EQ,INE365B0101
 Diamond Power Infrastructure Ltd.,Capital Goods,DIACABS,EQ,INE989C01038,microcap,DIACABS.NS
 Dilip Buildcon Ltd.,Construction,DBL,EQ,INE917M01012,microcap,DBL.NS
 Dr. Agarwal's Health Care Ltd.,Healthcare,AGARWALEYE,EQ,INE943P01029,microcap,AGARWALEYE.NS
-Dummy Allcargo Logistics Ltd.,Services,DUMMYALCAR,EQ,DUM418H01029,microcap,DUMMYALCAR.NS
+Dummy Inox Green Ltd.,Construction,DUMMYINXGN,EQ,DUM510W01014,microcap,DUMMYINXGN.NS
+Dummy Triveni Ltd.,Capital Goods,DUMMYTRVN,EQ,DUM256C01024,microcap,DUMMYTRVN.NS
 Dynamatic Technologies Ltd.,Capital Goods,DYNAMATECH,EQ,INE221B01012,microcap,DYNAMATECH.NS
 EPL Ltd.,Capital Goods,EPL,EQ,INE255A01020,microcap,EPL.NS
 Edelweiss Financial Services Ltd.,Financial Services,EDELWEISS,EQ,INE532F01054,microcap,EDELWEISS.NS
@@ -77,6 +78,7 @@ Godrej Agrovet Ltd.,Fast Moving Consumer Goods,GODREJAGRO,EQ,INE850D01014,microc
 Gokaldas Exports Ltd.,Textiles,GOKEX,EQ,INE887G01027,microcap,GOKEX.NS
 Gokul Agro Resources Ltd.,Fast Moving Consumer Goods,GOKULAGRO,EQ,INE314T01033,microcap,GOKULAGRO.NS
 Greaves Cotton Ltd.,Capital Goods,GREAVESCOT,EQ,INE224A01026,microcap,GREAVESCOT.NS
+Grindwell Norton Ltd.,Capital Goods,GRINDWELL,EQ,INE536A01023,microcap,GRINDWELL.NS
 Gujarat Ambuja Exports Ltd.,Fast Moving Consumer Goods,GAEL,EQ,INE036B01030,microcap,GAEL.NS
 Gujarat Narmada Valley Fertilizers and Chemicals Ltd.,Chemicals,GNFC,EQ,INE113A01013,microcap,GNFC.NS
 Gujarat Pipavav Port Ltd.,Services,GPPL,EQ,INE517F01014,microcap,GPPL.NS
@@ -95,7 +97,7 @@ India Shelter Finance Corporation Ltd.,Financial Services,INDIASHLTR,EQ,INE922K0
 Indian Metals & Ferro Alloys Ltd.,Metals & Mining,IMFA,EQ,INE919H01018,microcap,IMFA.NS
 Indigo Paints Ltd.,Consumer Durables,INDIGOPNTS,EQ,INE09VQ01012,microcap,INDIGOPNTS.NS
 Indo Count Industries Ltd.,Textiles,ICIL,EQ,INE483B01026,microcap,ICIL.NS
-Inox Green Energy Services Ltd.,Services,INOXGREEN,EQ,INE510W01014,microcap,INOXGREEN.NS
+Inox Green Energy Services Ltd.,Services,INOXGREEN,BE,INE510W01014,microcap,INOXGREEN.NS
 Ion Exchange (India) Ltd.,Utilities,IONEXCHANG,EQ,INE570A01022,microcap,IONEXCHANG.NS
 JK Lakshmi Cement Ltd.,Construction Materials,JKLAKSHMI,EQ,INE786A01032,microcap,JKLAKSHMI.NS
 JK Paper Ltd.,Forest Materials,JKPAPER,EQ,INE789E01012,microcap,JKPAPER.NS
@@ -104,7 +106,7 @@ Jamna Auto Industries Ltd.,Automobile and Auto Components,JAMNAAUTO,EQ,INE039C01
 Jana Small Finance Bank Ltd.,Financial Services,JSFB,EQ,INE953L01027,microcap,JSFB.NS
 Jayaswal Neco Industries Ltd.,Capital Goods,JAYNECOIND,EQ,INE854B01010,microcap,JAYNECOIND.NS
 Jeena Sikho Lifecare Ltd.,Consumer Services,JSLL,EQ,INE0J5801029,microcap,JSLL.NS
-Jupiter Life Line Hospitals Ltd.,Healthcare,JLHL,EQ,INE682M01012,microcap,JLHL.NS
+Jupiter Life Line Hospitals Ltd.,Healthcare,JLHL,EQ,INE682M01020,microcap,JLHL.NS
 Justdial Ltd.,Consumer Services,JUSTDIAL,EQ,INE599M01018,microcap,JUSTDIAL.NS
 Jyothy Labs Ltd.,Fast Moving Consumer Goods,JYOTHYLAB,EQ,INE668F01031,microcap,JYOTHYLAB.NS
 KNR Constructions Ltd.,Construction,KNRCON,EQ,INE634I01029,microcap,KNRCON.NS
@@ -155,7 +157,6 @@ Piccadily Agro Industries Ltd.,Fast Moving Consumer Goods,PICCADIL,EQ,INE546C010
 Power Mech Projects Ltd.,Construction,POWERMECH,EQ,INE211R01019,microcap,POWERMECH.NS
 Praj Industries Ltd.,Capital Goods,PRAJIND,EQ,INE074A01025,microcap,PRAJIND.NS
 Pricol Ltd.,Automobile and Auto Components,PRICOLLTD,EQ,INE726V01018,microcap,PRICOLLTD.NS
-Prime Focus Ltd.,Media Entertainment & Publication,PFOCUS,BE,INE367G01038,microcap,PFOCUS.NS
 Prism Johnson Ltd.,Construction Materials,PRSMJOHNSN,EQ,INE010A01011,microcap,PRSMJOHNSN.NS
 Privi Speciality Chemicals Ltd.,Chemicals,PRIVISCL,EQ,INE959A01019,microcap,PRIVISCL.NS
 Prudent Corporate Advisory Services Ltd.,Financial Services,PRUDENT,EQ,INE00F201020,microcap,PRUDENT.NS
@@ -228,7 +229,7 @@ Tilaknagar Industries Ltd.,Fast Moving Consumer Goods,TI,EQ,INE133E01013,microca
 Time Technoplast Ltd.,Capital Goods,TIMETECHNO,EQ,INE508G01029,microcap,TIMETECHNO.NS
 Tips Music Ltd.,Media Entertainment & Publication,TIPSMUSIC,EQ,INE716B01029,microcap,TIPSMUSIC.NS
 Transrail Lighting Ltd.,Capital Goods,TRANSRAILL,EQ,INE454P01035,microcap,TRANSRAILL.NS
-Triveni Engineering & Industries Ltd.,Fast Moving Consumer Goods,TRIVENI,EQ,INE256C01024,microcap,TRIVENI.NS
+Triveni Engineering & Industries Ltd.,Fast Moving Consumer Goods,TRIVENI,BE,INE256C01024,microcap,TRIVENI.NS
 Ujjivan Small Finance Bank Ltd.,Financial Services,UJJIVANSFB,EQ,INE551W01018,microcap,UJJIVANSFB.NS
 V-Guard Industries Ltd.,Consumer Durables,VGUARD,EQ,INE951I01027,microcap,VGUARD.NS
 V-Mart Retail Ltd.,Consumer Services,VMART,EQ,INE665J01013,microcap,VMART.NS
@@ -274,7 +275,7 @@ Angel One Ltd.,Financial Services,ANGELONE,EQ,INE732I01021,smallcap,ANGELONE.NS
 Anupam Rasayan India Ltd.,Chemicals,ANURAS,EQ,INE930P01018,smallcap,ANURAS.NS
 Aptus Value Housing Finance India Ltd.,Financial Services,APTUS,EQ,INE852O01025,smallcap,APTUS.NS
 Asahi India Glass Ltd.,Automobile and Auto Components,ASAHIINDIA,EQ,INE439A01020,smallcap,ASAHIINDIA.NS
-Aster DM Healthcare Ltd.,Healthcare,ASTERDM,EQ,INE914M01019,smallcap,ASTERDM.NS
+Aster DM Quality Care Ltd.,Healthcare,ASTERDM,EQ,INE914M01019,smallcap,ASTERDM.NS
 Ather Energy Ltd.,Automobile and Auto Components,ATHERENERG,EQ,INE0LEZ01016,smallcap,ATHERENERG.NS
 Atul Ltd.,Chemicals,ATUL,EQ,INE100A01010,smallcap,ATUL.NS
 BEML Ltd.,Capital Goods,BEML,EQ,INE258A01024,smallcap,BEML.NS
@@ -377,7 +378,6 @@ Inox Wind Ltd.,Capital Goods,INOXWIND,EQ,INE066P01011,smallcap,INOXWIND.NS
 Intellect Design Arena Ltd.,Information Technology,INTELLECT,EQ,INE306R01017,smallcap,INTELLECT.NS
 International Gemological Institute Ltd.,Services,IGIL,EQ,INE0Q9301021,smallcap,IGIL.NS
 Inventurus Knowledge Solutions Ltd.,Information Technology,IKS,EQ,INE115Q01022,smallcap,IKS.NS
-J.B. Chemicals & Pharmaceuticals Ltd.,Healthcare,JBCHEPHARM,EQ,INE572A01036,smallcap,JBCHEPHARM.NS
 JBM Auto Ltd.,Automobile and Auto Components,JBMA,EQ,INE927D01051,smallcap,JBMA.NS
 JK Tyre & Industries Ltd.,Automobile and Auto Components,JKTYRE,EQ,INE573A01042,smallcap,JKTYRE.NS
 JM Financial Ltd.,Financial Services,JMFINANCIL,EQ,INE780C01023,smallcap,JMFINANCIL.NS
@@ -439,6 +439,7 @@ Piramal Finance Ltd.,Financial Services,PIRAMALFIN,EQ,INE202B01038,smallcap,PIRA
 Piramal Pharma Ltd.,Healthcare,PPLPHARMA,EQ,INE0DK501011,smallcap,PPLPHARMA.NS
 Poly Medicure Ltd.,Healthcare,POLYMED,EQ,INE205C01021,smallcap,POLYMED.NS
 Poonawalla Fincorp Ltd.,Financial Services,POONAWALLA,EQ,INE511C01022,smallcap,POONAWALLA.NS
+Prime Focus Ltd.,Media Entertainment & Publication,PFOCUS,EQ,INE367G01038,smallcap,PFOCUS.NS
 R R Kabel Ltd.,Capital Goods,RRKABEL,EQ,INE777K01022,smallcap,RRKABEL.NS
 RBL Bank Ltd.,Financial Services,RBLBANK,EQ,INE976G01028,smallcap,RBLBANK.NS
 RHI MAGNESITA INDIA LTD.,Capital Goods,RHIM,EQ,INE743M01012,smallcap,RHIM.NS

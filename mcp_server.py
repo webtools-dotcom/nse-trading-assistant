@@ -9,6 +9,7 @@ from tools import (
     get_fundamentals_text, get_institutional_activity_text, check_upcoming_results,
     get_recent_announcements_text, get_announcement_reaction_text, get_catalyst_scan_text,
     get_snapshot_text_short, get_snapshot_text_long, get_live_price_text,
+    evaluate_user_trade,
 )
 from trade_journal import get_strategy_health
 from config import SHARED_RULES, DEFAULT_CAPITAL, DEFAULT_RISK_PCT
@@ -32,6 +33,13 @@ def scan_long_term(validated_only: bool = True, limit: int = 15) -> str:
 def full_analysis(ticker: str, term: str = "short") -> str:
     """Runs the complete forced checklist for one NSE stock: market regime, technical snapshot, fundamentals, institutional activity, upcoming results, and recent corporate announcements. term must be 'short' or 'long'."""
     return get_full_analysis(ticker, term)
+
+
+@mcp.tool()
+def evaluate_my_trade(ticker: str, entry_price: Optional[float] = None,
+                      shares: Optional[float] = None) -> str:
+    """Use whenever the user names a stock THEY chose or already bought, rather than one the scan surfaced - e.g. 'I bought 5 shares of XYZ at 400', 'thoughts on ABC?', 'is RELIANCE a good buy?'. Works for any NSE ticker, including ones outside the 748-stock universe. Pass entry_price and shares whenever the user mentions them; stop, targets and P&L are then computed against THEIR entry. States explicitly whether the backtested edge applies - when it says no edge applies, relay that plainly and do not quote strategy statistics as if they covered the trade."""
+    return evaluate_user_trade(ticker, entry_price, shares)
 
 
 @mcp.tool()

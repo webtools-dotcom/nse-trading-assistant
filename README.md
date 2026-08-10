@@ -208,24 +208,64 @@ CUSUM alarm is not raised (10% of trigger). Trade smaller until this resolves.
 
 ---
 
+## 🧪 Tested and REJECTED — do not re-litigate these
+
+Everything below was measured against a random-entry control, day-clustered, costs charged.
+They are listed so nobody spends another day rediscovering them.
+
+| Idea | Result | Where |
+|---|---|---|
+| Participant-flow regime gates (FPI/DII/retail percentiles, divergence) | No gate beat the ungated baseline. 16 configs. | `backtest_flow_gate.py` |
+| MAX effect (lottery preference) | Did not replicate; excluding high-MAX names hurt **monotonically** | `backtest_stock_proxies.py` |
+| Nominal share price, capital-gains overhang | Higher return/trade but LOWER z_paired — they cut trade count | same |
+| 52-week-high nearness | Untestable: RSI<30 and near-52w-high essentially never co-occur (2 trades) | same |
+| Price/CGO as **ranking** inputs | Worse than the existing net-EV sort | `backtest_ranking.py` |
+| Candidate-count gating ("only trade panic days") | ~Half is market beta — random entries show the same gradient | `backtest_concentration.py` |
+| **Event-driven news trading** (buy the filing, hold 1-3 days) | **Negative in every regime**; +0.00% edge in the 2023-24 bull run | `news_event_results.md` |
+| Short-term reversal as an extra filter | Literature confirms it IS the RSI<30 signal — adds nothing | `behavioral_rule_spec_2.md` |
+| Shallow vs deep pullback within Uptrend | Opposite of hypothesis; artefact of what RSI<30 looks like | (2026-07) |
+
+**What survived and got adopted:**
+- The ≥₹25cr liquidity filter (z_paired 3.28 vs 2.64 unfiltered)
+- Oversold-depth ordering (monotonic, unfitted)
+- Volatility-regime position scaling (calm −0.81% vs panic +1.64%)
+- Meta-label P(win) floor at 0.50
+- The existing net-EV **sort** — beat random candidate selection at every depth
+- **Dilution filter** — the single validated output of the whole news investigation
+
+---
+
 ## 🛠️ Feature set
 
+**Scanning & analysis**
 - ✅ Dual-horizon scanning, market-cap AND trend-tier aware, across 748 stocks
-- ✅ Relative strength vs Nifty 50 and sector peers
-- ✅ Market regime: breadth, Nifty trend, India VIX — forced cross-signal reasoning
-- ✅ Fundamentals with deterministic threshold labels (no LLM-narrated inconsistency)
+- ✅ **Per-candidate setup checklist** — the documented read-the-scan rules applied automatically, 8 PASS/WEAK/FAIL checks and a plain-English verdict, so the thresholds cannot be forgotten
+- ✅ **Market-conditions header** — how many names fired today, and what days like this historically returned (labelled as market beta, not signal quality)
+- ✅ **`evaluate_user_trade`** — analyse ANY ticker you name, including ones outside the 748 universe (live-fetched), with your own entry price. Says explicitly when no backtested edge applies
+- ✅ Relative strength vs Nifty 50 and sector peers; regime via breadth, Nifty trend, India VIX
+- ✅ Fundamentals with deterministic threshold labels; verified business descriptions
 - ✅ Institutional footprint: delivery % trend, bulk/block deals
-- ✅ **Real-time corporate announcements** — actual NSE filing text (`attchmntText`), not just category labels; catches events like management changes same-day
-- ✅ **News sentiment assessment** — agent explicitly labels headline tone, grounded only in real fetched text
-- ✅ Earnings calendar, sector-aware ("upcoming catalysts" scan)
-- ✅ Verified company descriptions, explicit anti-hallucination rules
-- ✅ Code-enforced risk gates — blocks >2% risk or parabolic setups until explicit confirmation
-- ✅ **Live price bypass** — position sizing and exit checks use real-time quotes, not cache-lagged prices
-- ✅ 📓 Personal trade journal — frozen entry snapshots, honest small-sample retrieval
-- ✅ 🚦 **Active exit monitoring** — validated stop/target/time-exit rule + VIX-spike early warning
-- ✅ 🕘 Persistent chat history (Streamlit) — resumable, deletable
-- ✅ **Multi-interface**: CLI, Streamlit browser UI, and **MCP server** (Claude Desktop, potentially other MCP clients)
-- ✅ Provider-agnostic (Groq, DeepSeek, Anthropic, local Ollama, self-hosted)
+- ✅ **Participant cash flows** — daily FPI / mutual fund / insurance / retail net buy-sell in ₹cr, 815 days cached
+- ✅ Real NSE filing text (`attchmntText`), earnings calendar, sector-aware catalyst scan
+
+**Risk & discipline**
+- ✅ Code-enforced risk gates — blocks >2% risk, parabolic setups, and P(win) below the 50% floor
+- ✅ **Validated dilution filter** — flags candidates that announced a QIP / rights issue / preferential allotment in the last 7 days (−0.29%/trade, z_paired −3.34)
+- ✅ **Discipline layer** — reads your own trade log: blocks adding to an open position, warns on revenge re-entry, concentration, loss streaks, and risk creep
+- ✅ **Position sizing is opt-in** — analysis never assumes your capital or softens a verdict because of account size
+- ✅ Live price bypass for anything time-sensitive
+
+**Journal & monitoring**
+- ✅ 📓 Trade journal with frozen entry snapshots (backdatable, reconstructs signals as-of entry date)
+- ✅ 🚦 Exit monitoring — validated stop/target/time-exit + VIX-spike warning
+- ✅ 📱 **Telegram bot** — the full agent by text message, plus deterministic `/exits` `/positions` `/scan` shortcuts
+- ✅ 📱 **Phone news watcher** — runs on a spare Android under Termux, watches all 748 stocks for material filings, LLM-triaged into urgent pushes vs one evening digest
+- ✅ 🚨 Exit alerts pushed to Telegram, state-driven so they fire once, not every poll
+
+**Infrastructure**
+- ✅ Multi-interface: CLI, Streamlit, MCP (Claude Desktop), Telegram
+- ✅ Provider-agnostic (currently Gemini Flash Lite; Groq / DeepSeek / Anthropic / Ollama supported)
+- ✅ **369k-filing news archive**, 2021-2026 — makes announcement strategies backtestable for the first time
 - ✅ Local caching layer, refreshed daily
 
 ---
@@ -271,28 +311,44 @@ flowchart TD
 
 ## 📁 Project structure
 
+```
 trading-assistant/
-├── config.py # watchlist, cap-bucket map, providers, risk defaults
-├── data_fetcher.py # short-term features (RSI, MACD, ATR, 1yr trend), live price
-├── data_fetcher_long.py # long-term features, fundamentals
-├── cache_manager.py # cache: price, delivery, bulk, Nifty, VIX, sector RS, breadth, results, announcements
-├── trade_journal.py # trade log: entry/exit, similarity, exit monitoring
-├── build_universe.py # one-time: 748-stock universe with market-cap ranks
-├── model_trainer_short.py # short-term XGBoost
-├── model_trainer_long.py # long-term XGBoost
-├── refresh_cache.py # run daily
-├── tools.py # all agent tools + risk-gating + labeling logic
-├── agent.py # Groq/OpenAI-compatible agent loop (CLI/Streamlit)
-├── mcp_server.py # MCP server (Claude Desktop / other MCP clients)
-├── main.py # CLI
-├── app.py # Streamlit UI + persistent chat history
-├── conversations/ # saved Streamlit chat threads
-├── nse_watchlist_expanded.csv # 748-stock universe, cap-bucket tags
-├── trade_log.csv # personal trade history
-├── requirements.txt
-├── trading_model_short.pkl
-└── trading_model_long.pkl
+├── config.py                  # watchlist, cap map, providers, risk + discipline defaults, SHARED_RULES prompt
+├── features.py                # single source of truth for feature computation
+├── data_fetcher.py            # short-term features, live price
+├── data_fetcher_long.py       # long-term features, fundamentals
+├── cache_manager.py           # all caches incl. participant category flows
+├── meta_label.py              # P(win) meta-model — replaced the dead XGBoost return-predictor
+├── trade_journal.py           # trade log, similarity, exit monitor, discipline layer
+├── decay_monitor.py           # CUSUM alarm on live edge decay
+├── tools.py                   # 23 agent tools, checklist, risk gates, dilution filter
+├── agent.py                   # provider-agnostic tool loop
+├── main.py / app.py           # CLI / Streamlit
+├── mcp_server.py              # MCP server (Claude Desktop)
+│
+├── notify.py                  # Telegram delivery (dependency-light, no pandas)
+├── telegram_bot.py            # chat with the agent by text message
+├── alert_watcher.py           # exit + market-condition alerts
+├── news_watcher.py            # 📱 phone: 748-stock filing watcher, LLM triage, evening digest
+│
+├── backtest_engine.py         # THE engine: non-overlap, costs, gaps, walk-forward, day-clustering
+├── backtest_day_clustered.py  # re-measures the headline tables
+├── backtest_flow_gate.py      # participant flows as regime gates — REJECTED
+├── backtest_stock_proxies.py  # MAX / price / CGO / 52w-high — REJECTED
+├── backtest_ranking.py        # candidate ranking schemes — current sort VALIDATED
+├── backtest_concentration.py  # edge-concentration by candidate count — mostly beta
+├── build_news_archive.py      # pages NSE for 5y of filings (369k)
+├── backtest_news_events.py    # event-driven trading — REJECTED
+│
+├── refresh_cache.py           # run daily
+├── build_universe.py          # one-time: 748-stock universe
+├── model_trainer_short.py / _long.py
+└── test_*.py                  # 7 offline test files, no network needed
+```
 
+**Results documents** — read these before re-testing anything:
+`day_clustered_results.md` · `news_event_results.md` · `edge_concentration_finding.md` ·
+`behavioral_rule_spec.md` + `_2.md` · `behavioral_proxy_inventory.md` · `WORKFLOW.md`
 
 ---
 
@@ -314,7 +370,7 @@ Daily: `python refresh_cache.py`, then `python main.py` / `streamlit run app.py`
 
 ---
 
-## 🔧 The 18 agent tools
+## 🔧 The 23 agent tools
 
 | Category | Tool | What it does |
 |---|---|---|
@@ -336,6 +392,8 @@ Daily: `python refresh_cache.py`, then `python main.py` / `streamlit run app.py`
 | 📓 Journal | `record_trade_entry` / `record_trade_exit` | Logs real entries/exits, freezes full signal snapshot |
 | 📓 Journal | `get_open_positions` | Lists currently open logged trades |
 | 📓 Journal | `get_similar_past_trades` | Real historical outcomes for a similar setup, honest sample-size caveats |
+| 🎯 Analysis | `evaluate_user_trade` | Analyse a stock **you** named, at **your** entry price — works outside the 748 universe, and says plainly when no backtested edge applies |
+| 📉 Journal | `get_strategy_health_text` | Your real closed trades vs backtested expectation + CUSUM decay alarm |
 | 🚦 Monitor | `get_exit_check_text` | Checks open positions against validated stop/target/time-exit + VIX-spike warning |
 
 ---
@@ -372,7 +430,11 @@ This is what eventually tells you whether the backtested edge survives contact w
   strategy fires on few names per day, so a stratum that fails it is *not demonstrated*, not
   disproven. The real figure sits between it and the trade-level number
 - Sector RS, Nifty RS, breadth, VIX are informed context, not independently re-backtested compound conditions
-- News/announcement signals cannot be backtested at all (no historical news archive) — explicitly real-time-only
+- ~~News/announcement signals cannot be backtested~~ — **fixed 2026-08**. NSE serves historical
+  filings; `build_news_archive.py` collected **369,120 filings (2021-2026)**. Event-driven trading
+  was then measured and **rejected** (see `news_event_results.md`): entering at the next open after
+  a filing loses money in every regime, including the 2023-24 bull run where the edge was +0.00%.
+  The one survivor is a **negative** signal — dilution announcements — now wired in as a filter
 - Yahoo's NSE data can lag 10+ hours after close on some days — mitigated via live-price bypass for anything time-sensitive
 - Trade journal stats are anecdotal until real volume accumulates — the tool says so explicitly
 

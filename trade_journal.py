@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np
 import os
 from datetime import datetime
-from config import SHORT_HORIZON_DAYS, LONG_HORIZON_DAYS
+from config import (SHORT_HORIZON_DAYS, LONG_HORIZON_DAYS, MAX_OPEN_POSITIONS,
+                    REVENGE_WINDOW_DAYS, LOSS_STREAK_LENGTH)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TRADE_LOG_FILE = os.path.join(BASE_DIR, "trade_log.csv")
@@ -36,7 +37,10 @@ def _save_log(df):
     df.to_csv(TRADE_LOG_FILE, index=False)
 
 
-def log_trade_entry(ticker, term, shares, capital_used, risk_pct, levels, market_regime=None, entry_price=None):
+def log_trade_entry(ticker, term, shares, capital_used, risk_pct, levels, market_regime=None,
+                    entry_price=None, entry_date=None):
+    """entry_date (YYYY-MM-DD) backdates a trade that was taken days ago. Without it the row is
+    stamped today, which silently corrupts days-held and therefore the time-exit rule."""
     df = _load_log()
 
     live_price = None
@@ -48,7 +52,9 @@ def log_trade_entry(ticker, term, shares, capital_used, risk_pct, levels, market
 
     reference_price = live_price if live_price is not None else levels['current_price']
 
-    if entry_price is not None and reference_price is not None:
+    # The sanity check compares against TODAY's price, which is only meaningful for a trade
+    # entered today. A backdated entry legitimately differs from the current price.
+    if entry_price is not None and reference_price is not None and entry_date is None:
         if abs(entry_price - reference_price) / reference_price > 0.15:
             # Provided entry_price is wildly off from real price - almost certainly an error, ignore it
             entry_price = None
@@ -61,7 +67,7 @@ def log_trade_entry(ticker, term, shares, capital_used, risk_pct, levels, market
         'trade_id': trade_id,
         'ticker': ticker,
         'term': term,
-        'entry_date': datetime.now().strftime('%Y-%m-%d'),
+        'entry_date': entry_date or datetime.now().strftime('%Y-%m-%d'),
         'entry_price': actual_entry_price,
         'stop_loss': levels.get('stop_loss'),
         'target': levels.get('target'),
@@ -135,6 +141,80 @@ def get_open_positions():
     for _, row in open_df.iterrows():
         text += f"  {row['ticker']} ({row['term']}) - entered {row['entry_date']} @ ₹{row['entry_price']}, {row['shares']} shares\n"
     return text
+
+
+def discipline_check(ticker, risk_pct=None):
+    """Behavioural guardrails read off the user's OWN trade log.
+
+    Deliberately makes no claim about future prices - these constrain the trader, not the
+    trade, which is why they carry no backtest. Every message says what the user actually did,
+    so it can be argued with rather than obeyed blindly.
+
+    Returns {'blocks': [...], 'warnings': [...]}. Blocks are overridable with confirmed=true,
+    matching the existing risk gates.
+    """
+    out = {'blocks': [], 'warnings': []}
+    try:
+        df = _load_log()
+    except Exception:
+        return out
+    if len(df) == 0:
+        return out
+
+    ticker = (ticker or '').strip().upper()
+    open_df = df[df['status'] == 'open']
+
+    # Adding to a position the plan never said to add to. The validated strategy enters once
+    # and exits on stop/target/time - there is no pyramiding or averaging-down rule in it.
+    same = open_df[open_df['ticker'].str.upper() == ticker] if len(open_df) else open_df
+    if len(same) > 0:
+        row = same.iloc[0]
+        out['blocks'].append(
+            f"You already hold {ticker} - entered {row['entry_date']} at Rs{row['entry_price']}, "
+            f"{row['shares']} shares. Buying more is averaging down or pyramiding, and neither "
+            f"is part of the tested plan (one entry, exit on stop/target/time). If this is "
+            f"deliberate, say so and I will size it.")
+
+    if len(open_df) >= MAX_OPEN_POSITIONS:
+        out['warnings'].append(
+            f"{len(open_df)} positions already open (your discipline limit is "
+            f"{MAX_OPEN_POSITIONS}). Each new name adds correlated exposure - oversold NSE "
+            f"mid/smallcaps tend to fall together.")
+
+    closed = df[df['status'] == 'closed'].copy()
+    if len(closed) == 0:
+        return out
+    closed['_exit'] = closed['exit_date'].apply(_parse_date)
+    closed = closed.dropna(subset=['_exit']).sort_values('_exit')
+
+    # Revenge re-entry: the same name that just stopped you out.
+    recent_stops = closed[
+        (closed['ticker'].str.upper() == ticker)
+        & (closed['exit_type'].astype(str).str.contains('stop', case=False, na=False))
+        & (closed['_exit'] >= datetime.now() - pd.Timedelta(days=REVENGE_WINDOW_DAYS))]
+    if len(recent_stops) > 0:
+        r = recent_stops.iloc[-1]
+        out['warnings'].append(
+            f"{ticker} stopped you out on {r['exit_date']} ({r['return_pct']}%), within the last "
+            f"{REVENGE_WINDOW_DAYS} days. Re-entering a name that just hurt you is the classic "
+            f"revenge trade - it may still be a valid setup, but say why it is different now.")
+
+    # Size creep after losses.
+    last = closed.tail(LOSS_STREAK_LENGTH)
+    if len(last) == LOSS_STREAK_LENGTH and (pd.to_numeric(last['return_pct'], errors='coerce') < 0).all():
+        out['warnings'].append(
+            f"Your last {LOSS_STREAK_LENGTH} closed trades were all losses "
+            f"({', '.join(f'{v}%' for v in last['return_pct'])}). Nothing says the next one is "
+            f"more likely to lose - but this is exactly when size creeps up to 'win it back'. "
+            f"Consider trading smaller, not larger.")
+
+    if risk_pct is not None:
+        hist = pd.to_numeric(closed['risk_pct'], errors='coerce').dropna()
+        if len(hist) >= 5 and risk_pct > hist.median() * 1.5:
+            out['warnings'].append(
+                f"Requested risk {risk_pct}% is well above your own historical median of "
+                f"{hist.median():.2f}% across {len(hist)} logged trades. Deliberate, or drift?")
+    return out
 
 
 def get_similar_past_trades(term, validated_setup=None):
