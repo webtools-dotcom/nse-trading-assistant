@@ -35,7 +35,7 @@ from config import round_trip_cost_pct
 
 def simulate_trades(stock_df, entry_mask, horizon_days=6, stop_atr_mult=2.0,
                     target_atr_mult=2.0, charge_costs=True, allow_overlap=False,
-                    exit_rsi=None):
+                    exit_rsi=None, stop_pct=None, target_pct=None):
     """Simulate trades for one stock.
 
     entry_mask: boolean array aligned to stock_df rows.
@@ -74,8 +74,9 @@ def simulate_trades(stock_df, entry_mask, horizon_days=6, stop_atr_mult=2.0,
             continue
 
         entry = close[i]
-        stop = entry - stop_atr_mult * atr[i]
-        target = entry + target_atr_mult * atr[i]
+        # stop_pct/target_pct (fixed %) take precedence over ATR multiples when given.
+        stop = entry * (1 - stop_pct) if stop_pct is not None else entry - stop_atr_mult * atr[i]
+        target = entry * (1 + target_pct) if target_pct is not None else entry + target_atr_mult * atr[i]
 
         exit_price, reason, held = None, None, horizon_days
         for j in range(1, horizon_days + 1):
@@ -480,6 +481,10 @@ def demo():
     #     recovers RSI within the horizon, so at least one trade should exit on it).
     rsi_ex = simulate_trades(df, m, charge_costs=False, exit_rsi=45)
     assert any(t['reason'] == 'rsi_recover' for t in rsi_ex), "exit_rsi branch never fired"
+
+    # 5c. Percentage stops must produce trades whose returns are finite (fill at entry*(1±pct)).
+    pct = simulate_trades(df, m, charge_costs=False, stop_pct=0.08, target_pct=0.16)
+    assert pct and all(np.isfinite(t['net_pct']) for t in pct), "percentage-stop path broken"
 
     # 6. Deflated Sharpe must reject the best of many pure-noise trials.
     noise_srs = [sharpe(rng.normal(0, 6, 400), holding_days=6) for _ in range(200)]
