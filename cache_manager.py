@@ -180,26 +180,43 @@ def backfill_delivery_history(tickers, target_days=30, max_calendar_days_back=50
     return collected
 
 
-def update_delivery_history(tickers, keep_days=30):
-    """Daily incremental update: adds today, drops oldest, keeps a rolling window."""
+def update_delivery_history(tickers, keep_days=30, max_lookback_days=7):
+    """Daily incremental update: backfills any missing recent trading day (not just today),
+    drops oldest, keeps a rolling window. A single day's fetch failing (late NSE publish,
+    weekend, holiday) no longer strands the history behind - the next run fills the gap."""
     symbols = set(t.replace(".NS", "") for t in tickers)
-    today_str = datetime.now().strftime('%d-%m-%Y')
-
-    try:
-        df_today = capital_market.bhav_copy_with_delivery(trade_date=today_str)
-        df_today = df_today[df_today['SYMBOL'].isin(symbols)].copy()
-        df_today['DATE_FETCHED'] = today_str
-    except Exception as e:
-        print(f"Could not fetch today's delivery data (market closed?): {e}")
-        return load_delivery_history() if os.path.exists(DELIVERY_HISTORY_FILE) else None
 
     if os.path.exists(DELIVERY_HISTORY_FILE):
         with open(DELIVERY_HISTORY_FILE, 'rb') as f:
             history = pickle.load(f)
-        history = history[history['DATE_FETCHED'] != today_str]  # avoid duplicate if rerun same day
-        history = pd.concat([history, df_today], ignore_index=True)
+        have_dates = set(history['DATE_FETCHED'].unique())
     else:
-        history = df_today
+        history = None
+        have_dates = set()
+
+    fetched = []
+    current_date = datetime.now()
+    for _ in range(max_lookback_days):
+        date_str = current_date.strftime('%d-%m-%Y')
+        current_date -= timedelta(days=1)
+        if date_str in have_dates:
+            continue  # already have it
+        try:
+            df = capital_market.bhav_copy_with_delivery(trade_date=date_str)
+            df = df[df['SYMBOL'].isin(symbols)].copy()
+            df['DATE_FETCHED'] = date_str
+            if len(df) > 0:
+                fetched.append(df)
+                print(f"  Delivery data fetched for {date_str}: {len(df)} stocks")
+        except Exception:
+            pass  # weekend/holiday/not-yet-published, skip silently
+
+    if not fetched:
+        print("Could not fetch any new delivery data (weekend/holiday, or NSE not yet published).")
+        return history
+
+    frames = ([history] if history is not None else []) + fetched
+    history = pd.concat(frames, ignore_index=True)
 
     unique_dates = sorted(history['DATE_FETCHED'].unique(), key=lambda d: datetime.strptime(d, '%d-%m-%Y'))
     if len(unique_dates) > keep_days:
