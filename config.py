@@ -99,7 +99,7 @@ GROSS_EDGE_BY_RSI = [
     (100, 0.60),
 ]
 GROSS_EDGE_SHORT_PCT = 0.77     # fallback: shallowest band still inside the RSI<30 scan
-GROSS_EDGE_LONG_PCT = 2.50      # momentum setup, ~1 month hold (rougher estimate)
+GROSS_EDGE_LONG_PCT = 1.50      # near-52w-high screen, measured Small-cap gross (backtest_longterm.py); Mid/Large ~0
 
 
 # Market-volatility regime multiplier for short-term mean reversion. Measured on 5 years,

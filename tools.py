@@ -1,5 +1,6 @@
 import json
 import pickle
+import numpy as np
 import pandas as pd
 import yfinance as yf
 from datetime import datetime
@@ -363,10 +364,11 @@ def scan_watchlist_text_long(limit=30, validated_only=True):
     if not has_turnover:
         text += "NOTE: cache predates the liquidity filter - run refresh_cache.py to enable it. Costs below assume worst-case impact.\n"
     text += (f"Long-term scan - sorted by NET expected value after costs, showing up to {limit}.\n"
-             f"⚠️ CAP-TIER CAVEAT: the published z-scores (Small 14.52, Mid 2.88, Large 2.28) were computed with "
-             f"OVERLAPPING trades. Deflating by the measured 1.70x inflation gives Small ~8.5 (holds), Mid ~1.7 and "
-             f"Large ~1.3 (NOT significant). Treat Mid- and Large-cap long-term setups as UNVALIDATED until "
-             f"re-tested; only the Small-cap claim survives correction.\n\n")
+             f"⚠️ CAP-TIER REALITY (validated 2026-08, day-clustered, costs charged): the old z-scores "
+             f"(Small 14.52, Mid 2.88, Large 2.28) were ~2.9x overlap-inflated. Honest: Small z 4.28 HOLDS; "
+             f"Mid (z -0.01) and Large (z 0.34) are DEAD - no edge over random, do not present them as setups. "
+             f"NOTE: the stronger validated long-term signal is the cross-sectional MOMENTUM scan "
+             f"(scan_watchlist_text_long_momentum), not this near-52w-high screen.\n\n")
     for _, row in df.head(limit).iterrows():
         turn = f"{row['turnover_60d_cr']}cr/day" if row['turnover_60d_cr'] is not None else "turnover n/a"
         text += (f"{row['ticker']} [{row['cap_bucket']}]: Price ₹{row['current_price']}, momentum {row['momentum_60d_pct']}%, "
@@ -379,6 +381,65 @@ def scan_watchlist_text_long(limit=30, validated_only=True):
     text += ("\nNET expected value = estimated gross edge minus Indian round-trip costs. The long-term gross edge "
              "has NOT yet been re-validated with the corrected engine - treat it as provisional and say so.\n")
     return text
+
+
+def scan_watchlist_text_long_momentum(limit=30):
+    """Cross-sectional momentum scan - the VALIDATED long-term signal (2026-08).
+    Ranks the liquid Mid/Small universe by 12M-1M momentum (skip the most recent month) and surfaces
+    the TOP QUARTILE - the highest-z config in validation (day-clustered z ~9.5 out-of-sample, net
+    ~+1.5%/trade over ~20 trading days). Far stronger than the old near-52w-high screen (only
+    Small-cap survived that, z 4.28; Mid/Large were dead). Lower-volatility names within the basket
+    historically added return (the 'quality momentum' tilt) - atr% is shown so you can prefer them.
+    A hard top-decile+low-vol filter maxed net/trade but left too few names for a basket, so the
+    default is the broader, higher-z top quartile.
+
+    THIS IS A BASKET STRATEGY: hold SEVERAL of the top names, rebalanced ~monthly - not a single
+    pick. Momentum CRASHES: 2 of the 5 backtested years were negative (the top names underperformed
+    the universe). High return, high drawdown - size small and diversify across the basket.
+    """
+    cache = load_price_cache_long()
+    rows = []
+    for ticker, df in cache.items():
+        cap = CAP_BUCKET_MAP.get(ticker)
+        if cap not in ('Mid', 'Small'):
+            continue
+        d = df.dropna(subset=['close', 'turnover_60d'])
+        if len(d) < 260:
+            continue
+        c = d['close'].values
+        turn = float(d['turnover_60d'].values[-1])
+        if not np.isfinite(turn) or turn < MIN_TURNOVER_INR or c[-252] <= 0:
+            continue
+        mom = c[-21] / c[-252] - 1                     # 12M-1M: return from 252 bars ago to 21 bars ago
+        atrp = d['atr_pct'].values[-1]                 # normalised volatility, not absolute price std
+        rows.append({'ticker': ticker, 'cap': cap, 'price': round(float(c[-1]), 2),
+                     'mom_pct': round(mom * 100, 1),
+                     'atr_pct': round(float(atrp), 1) if np.isfinite(atrp) else None,
+                     'turn_cr': round(turn / 1e7, 1)})
+
+    if not rows:
+        return "Long-term momentum scan: no liquid Mid/Small stocks with >=260 bars of history. Run refresh_cache.py."
+
+    d = pd.DataFrame(rows)
+    d['mom_rank'] = d['mom_pct'].rank(pct=True)
+    top = d[d['mom_rank'] >= 0.75].sort_values('mom_pct', ascending=False)   # top quartile = the validated basket
+
+    text = cache_status_note()
+    text += (f"Long-term MOMENTUM scan (validated 2026-08, day-clustered z ~9.5 out-of-sample, net "
+             f"~+1.5%/trade over ~20 trading days). Top quartile of the liquid Mid/Small universe by "
+             f"12-month momentum ({len(top)} names today).\n"
+             f"⚠️ BASKET strategy - hold SEVERAL and rebalance ~monthly, NOT a single pick. Prefer "
+             f"lower atr% names (the low-vol / 'quality momentum' tilt added return in tests). Momentum "
+             f"CRASHES: 2 of 5 backtested years were negative. High return, high drawdown - size small.\n\n")
+    for _, r in top.head(limit).iterrows():
+        stop = round(r['price'] * (1 - LONG_STOP_PCT), 2)
+        target = round(r['price'] * (1 + LONG_TARGET_PCT), 2)
+        atr_s = f"{r['atr_pct']}% atr" if r['atr_pct'] is not None else "atr n/a"
+        text += (f"{r['ticker']} [{r['cap']}]: Rs{r['price']}, 12M mom {r['mom_pct']:+.1f}%, {atr_s}, "
+                 f"{r['turn_cr']}cr/day | stop Rs{stop} (-{LONG_STOP_PCT*100:.0f}%), "
+                 f"target Rs{target} (+{LONG_TARGET_PCT*100:.0f}%)\n")
+    return text
+
 
 def label_debt_to_equity(value):
     if value is None:
@@ -1472,7 +1533,7 @@ TOOL_DEFINITIONS = [
     }},
     {"type": "function", "function": {
         "name": "scan_watchlist_text_long",
-        "description": "Scans watchlist for ~1 month position-trade setups: near 52-week high + confirmed uptrend + outperforming Nifty (momentum strategy). Buy strength, not weakness.",
+        "description": "Long-term (~1 month) MOMENTUM scan: ranks the liquid Mid/Small universe by 12-month momentum and surfaces the VALIDATED top quartile as a diversified BASKET (day-clustered z ~9.5 out-of-sample, net ~+1.5%/trade). Buy strength. WARNING: momentum crashes hard periodically - present it as a basket held ~monthly and sized small, NOT a single pick.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -1616,9 +1677,8 @@ def execute_tool(function_name, function_args):
         rsi_threshold = parse_number(function_args.get('rsi_threshold', 30), default=30)
         return scan_watchlist_text_short(limit, rsi_threshold)
     elif function_name == "scan_watchlist_text_long":
-        validated_only = parse_bool(function_args.get('validated_only', True))
         limit = int(parse_number(function_args.get('limit', 30), default=30))
-        return scan_watchlist_text_long(limit, validated_only)
+        return scan_watchlist_text_long_momentum(limit)
     elif function_name == "get_catalyst_scan_text":
         limit = int(parse_number(function_args.get('limit', 15), default=15))
         return get_catalyst_scan_text(limit)

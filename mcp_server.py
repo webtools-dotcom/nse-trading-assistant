@@ -2,7 +2,7 @@ from typing import Optional
 import json
 from mcp.server.fastmcp import FastMCP
 from tools import (
-    scan_watchlist_text_short, scan_watchlist_text_long, get_full_analysis,
+    scan_watchlist_text_short, scan_watchlist_text_long, scan_watchlist_text_long_momentum, get_full_analysis,
     calculate_position_size, get_exit_check_text, get_similar_past_trades,
     record_trade_entry, record_trade_exit, get_significant_announcements_scan,
     get_upcoming_catalysts_scan, get_market_regime_text, get_open_positions,
@@ -24,9 +24,9 @@ def scan_short_term(rsi_threshold: int = 30, limit: int = 30) -> str:
 
 
 @mcp.tool()
-def scan_long_term(validated_only: bool = True, limit: int = 15) -> str:
-    """Scans the NSE watchlist for ~1 month position-trade setups (near 52-week high + uptrend), sorted by net expected value after costs. PROVISIONAL: the long-term z-scores were computed with overlapping trades and have not yet been re-validated through the corrected engine."""
-    return scan_watchlist_text_long(limit, validated_only)
+def scan_long_term(limit: int = 15) -> str:
+    """Long-term (~1 month) MOMENTUM scan: ranks the liquid Mid/Small universe by 12-month momentum and surfaces the VALIDATED top quartile as a diversified BASKET (day-clustered z ~9.5 out-of-sample, net ~+1.5%/trade). Buy strength. WARNING: momentum crashes periodically - hold several names, rebalance ~monthly, size small; not a single pick."""
+    return scan_watchlist_text_long_momentum(limit)
 
 
 @mcp.tool()
