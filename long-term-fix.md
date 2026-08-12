@@ -299,6 +299,7 @@ def build_rows():
         c = df['close'].values
         turn = df['turnover_60d'].values
         n = len(c)
+        vol = pd.Series(c).rolling(10).std().values   # add_long_features has no volatility_10; compute inline
         mom = np.full(n, np.nan)
         fwd = np.full(n, np.nan)
         for i in range(252, n - H):
@@ -307,7 +308,7 @@ def build_rows():
             if c[i] > 0:
                 fwd[i] = (c[i + H] - c[i]) / c[i] * 100 - round_trip_cost_pct(turn[i])
         rows.append(pd.DataFrame({'date': df['date'].values, 'ticker': t, 'mom': mom,
-                                  'vol': df['volatility_10'].values, 'fwd': fwd, 'turn': turn}))
+                                  'vol': vol, 'fwd': fwd, 'turn': turn}))
     a = pd.concat(rows).dropna(subset=['mom', 'fwd'])
     return a[a['turn'] >= MIN_TURNOVER_INR].copy()
 
