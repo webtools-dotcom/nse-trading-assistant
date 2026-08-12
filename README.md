@@ -192,17 +192,19 @@ CUSUM alarm is not raised (10% of trigger). Trade smaller until this resolves.
 
 | | |
 |---|---|
-| **Signal** | Near 52-week high + confirmed uptrend (Price > SMA50 > SMA200) — **momentum**, not mean-reversion |
-| **Exit** | Fixed −8% stop-loss / +16% target |
+| **Signal (validated 2026-08)** | **Cross-sectional 12-month momentum** — rank the liquid Mid/Small universe, buy the top-quartile **basket**. Day-clustered **z ~9.5 out-of-sample**, net ~+1.5%/trade over ~20 days (`backtest_longterm_xsec.py`, `backtest_longterm_oos.py`). Low-vol names within the basket add return (quality-momentum tilt). |
+| **Exit** | Fixed −8% stop-loss / +16% target, ~monthly rebalance |
+| **⚠️ Crash risk** | Momentum is high-return, high-drawdown: **2 of 5 backtested years were negative** (winners underperformed). Hold a diversified basket, size small. |
 
-| Segment | Published z | Status |
-|---|---|---|
-| Small-cap | 14.52 | ⏳ Not yet re-validated |
-| Mid-cap | 2.88 | ⏳ Not yet re-validated — likely fails once overlap is corrected |
-| Large-cap | 2.28 | ⏳ Not yet re-validated — likely fails once overlap is corrected |
+**Legacy near-52w-high screen, re-validated honestly** (was 2.9× overlap-inflated):
 
-> ⚠️ The long-term figures are still the **original, overlap-inflated** numbers. They have not
-> yet been re-run through `backtest_engine.py`. Treat them as provisional.
+| Segment | Published z | Honest z_paired | Status |
+|---|---|---|---|
+| Small-cap | 14.52 | **4.28** | ✅ Holds |
+| Mid-cap | 2.88 | **−0.01** | ❌ Dead — retired |
+| Large-cap | 2.28 | **0.34** | ❌ Dead — retired |
+
+> The near-high *screen* only ever worked in Small-cap; the cross-sectional momentum *rank* above is the stronger validated signal and works across Mid+Small.
 
 > 🚫 RSI-oversold at the 1-month horizon *underperformed* random (z=-2.98) — mean-reversion and momentum are opposite effects at different horizons.
 
