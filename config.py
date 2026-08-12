@@ -143,11 +143,11 @@ def gross_edge_for_meta(p_win):
 def vol_regime_multiplier(vol_percentile):
     """Risk multiplier for the current market-volatility regime. Returns (multiplier, note)."""
     if vol_percentile is None or vol_percentile != vol_percentile:
-        return 1.0, "market volatility regime unknown - no adjustment applied"
+        return 0.5, "market volatility regime unknown - conservative half-size until it is known"
     for floor, mult, note in VOL_REGIME_SIZING:
         if vol_percentile >= floor:
             return mult, note
-    return 1.0, "market volatility regime unknown - no adjustment applied"
+    return 0.5, "market volatility regime unknown - conservative half-size until it is known"
 
 
 def gross_edge_for_rsi(rsi):

@@ -1140,6 +1140,7 @@ def evaluate_user_trade(ticker, entry_price=None, shares=None):
     price_now = live if live is not None else levels['current_price']
     price_label = "live" if live is not None else "last close (live quote unavailable)"
     atr = levels['atr']
+    atr_ok = atr is not None and pd.notna(atr) and atr > 0
 
     out = [f"USER-SELECTED TRADE REVIEW - {ticker}", ""]
     out.append(_universe_verdict(ticker, levels, source))
@@ -1151,7 +1152,10 @@ def evaluate_user_trade(ticker, entry_price=None, shares=None):
                    f"{levels.get('turnover_60d_cr')}cr/day | "
                    f"round-trip cost {levels.get('round_trip_cost_pct')}%")
 
-    if entry_price is not None and entry_price > 0:
+    if not atr_ok:
+        out.append("\nATR is unavailable for this ticker (insufficient recent data), so stop and "
+                   "target levels cannot be computed. Do not guess them.")
+    elif entry_price is not None and entry_price > 0:
         pnl = (price_now - entry_price) / entry_price * 100
         stop = entry_price - SHORT_STOP_ATR_MULT * atr
         t1, t2 = entry_price + 2 * atr, entry_price + 3.5 * atr
