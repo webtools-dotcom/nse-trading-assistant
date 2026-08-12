@@ -3,11 +3,11 @@ from cache_manager import (
     update_delivery_history, refresh_bulk_deals_cache, refresh_upcoming_results_cache,
     refresh_nifty_cache, refresh_sector_relative_strength, refresh_market_breadth,
     refresh_vix_cache, refresh_corp_announcements_cache, update_category_flows,
-    CACHE_DIR, CACHE_META_FILE,
+    newest_short_data_date, CACHE_DIR, CACHE_META_FILE,
 )
 from config import WATCHLIST
 import pickle
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 STEPS = [
     ("price_cache_short", lambda: refresh_price_cache_short(WATCHLIST)),
@@ -24,6 +24,28 @@ STEPS = [
 ]
 
 MIN_COVERAGE = 0.95  # below this, the universe is too thin to trust a scan
+
+# NSE hours in IST. India has no DST, so a fixed offset is exact.
+IST = timezone(timedelta(hours=5, minutes=30))
+MARKET_OPEN, MARKET_CLOSE = (9, 15), (15, 30)
+
+
+def _intraday_note():
+    """Refreshing mid-session writes TODAY'S UNFINISHED CANDLE into the cache.
+
+    The strategy is defined on daily closes, so every derived figure - RSI, ATR, volume spike,
+    turnover - is then computed from a partial bar. Measured on a real 14:14 refresh: RSI moved
+    up to 17 points against the previous close, volume read 0.64x a full day, and the scan
+    surfaced 3 candidates where the completed session gave 5. Nothing is corrupted and it
+    self-corrects after the close, but a silent 40% swing in what the scan shows is exactly the
+    kind of thing that should not be silent.
+    """
+    now = datetime.now(IST)
+    if now.weekday() >= 5 or not (MARKET_OPEN <= (now.hour, now.minute) <= MARKET_CLOSE):
+        return None
+    return (f"  ⚠️  REFRESHED MID-SESSION ({now:%H:%M} IST, market closes 15:30). Today's bar is "
+            f"INCOMPLETE, so RSI/ATR/volume and the candidate count are provisional and will "
+            f"change by the close. Re-run after 15:30 before acting on a scan.")
 
 
 def _ok(result):
@@ -94,12 +116,16 @@ if __name__ == "__main__":
     print("\n--- Refresh summary ---")
     for name, ok in results.items():
         print(f"  {'OK' if ok else 'FAILED'}: {name}")
+    intraday = _intraday_note()
+    if intraday:
+        notes.append(intraday)
     for n in notes:
         print(n)
 
     if results.get("price_cache_short") and results.get("price_cache_long"):
         with open(CACHE_META_FILE, 'wb') as f:
-            pickle.dump({'last_refreshed': datetime.now()}, f)
+            pickle.dump({'last_refreshed': datetime.now(),
+                         'newest_data_date': newest_short_data_date()}, f)
         if failed:
             print(f"\nCache timestamp updated, but {len(failed)} step(s) failed: {', '.join(failed)}")
         elif notes:

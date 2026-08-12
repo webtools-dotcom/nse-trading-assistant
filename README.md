@@ -31,7 +31,7 @@ Every strategy here was validated against **5 years of data across a 748-stock N
 | | |
 |---|---|
 | **Signal** | RSI < 30 (oversold), Mid/Small-cap, **≥ ₹25 cr median daily turnover** |
-| **Exit** | 2× ATR stop-loss / 2×–3.5× ATR targets, 6-day time exit |
+| **Exit** | 4× ATR stop-loss / 2×–3.5× ATR targets, 6-day time exit (stop widened from 2× on 2026-08-11 — `backtest_exits.py`: net/trade +0.53%→+0.70%, z_paired held, robust in 4/5 periods) |
 | **Backtest** | 702 stocks, 5 years, non-overlapping trades, **net of Indian transaction costs** |
 
 #### ⚠️ Corrected statistics (2026-07)
@@ -224,6 +224,9 @@ They are listed so nobody spends another day rediscovering them.
 | **Event-driven news trading** (buy the filing, hold 1-3 days) | **Negative in every regime**; +0.00% edge in the 2023-24 bull run | `news_event_results.md` |
 | Short-term reversal as an extra filter | Literature confirms it IS the RSI<30 signal — adds nothing | `behavioral_rule_spec_2.md` |
 | Shallow vs deep pullback within Uptrend | Opposite of hypothesis; artefact of what RSI<30 looks like | (2026-07) |
+| Raising the P(win) tradeable floor (0.50 → 0.55/0.60) | Net/trade rises but z_paired FALLS — fewer paired days; same trap as nominal price | (2026-08) |
+| Trading big single-day gainers (pre-signal or post-pop drift) | No pre-move tell (day-before ≈ random); post-pop drift ≤ random. Money was intraday only | (2026-08) |
+| Illiquid small-caps (below the ₹25cr floor) | Gross edge comparable, but ~3× costs make every band net-negative — a cost wall, not a signal gap | (2026-08) |
 
 **What survived and got adopted:**
 - The ≥₹25cr liquidity filter (z_paired 3.28 vs 2.64 unfiltered)

@@ -10,7 +10,7 @@ from trade_journal import (check_exit_signals, log_trade_entry, log_trade_exit, 
 from cache_manager import (
     load_sector_rs_cache, load_market_breadth_cache, load_vix_cache, load_corp_announcements_cache,
     load_price_cache_short, load_price_cache_long, load_bulk_deals_cache,
-    get_cache_age, load_delivery_history, load_upcoming_results, load_nifty_cache
+    get_cache_age, get_data_date, load_delivery_history, load_upcoming_results, load_nifty_cache
 )
 from meta_label import score_latest
 from config import (
@@ -18,7 +18,8 @@ from config import (
     LONG_FEATURE_COLUMNS, LONG_MODEL_PATH, LONG_HORIZON_DAYS, LONG_STOP_PCT, LONG_TARGET_PCT,
     DEFAULT_CAPITAL, DEFAULT_RISK_PCT, MAX_RISK_PCT,
     MIN_TURNOVER_INR, GROSS_EDGE_SHORT_PCT, GROSS_EDGE_LONG_PCT, round_trip_cost_pct,
-    gross_edge_for_rsi, vol_regime_multiplier, gross_edge_for_meta, META_MIN_TRADEABLE
+    gross_edge_for_rsi, vol_regime_multiplier, gross_edge_for_meta, META_MIN_TRADEABLE,
+    SHORT_STOP_ATR_MULT
 )
 
 HIGH_SIGNAL_ANNOUNCEMENT_KEYWORDS = [
@@ -106,10 +107,20 @@ def cache_status_note():
     age = get_cache_age()
     if age is None:
         return "WARNING: No cache found - run refresh_cache.py first.\n"
+    note = ""
+    # DATA vintage, not file age: a fresh refresh can still hold stale prices when Yahoo's NSE
+    # feed lags after close. Warn on the actual newest bar date so a stale price is never silent.
+    data_date = get_data_date()
+    if data_date is not None:
+        days = (datetime.now().date() - pd.Timestamp(data_date).date()).days
+        if days >= 1:
+            note += (f"⚠️ PRICES ARE FROM {pd.Timestamp(data_date).date()} ({days} day(s) old) - "
+                     f"Yahoo NSE data can lag after close. Re-run refresh_cache.py, or ask for the live "
+                     f"price of a specific stock for an exact current quote.\n")
     hours = age.total_seconds() / 3600
     if hours > 20:
-        return f"NOTE: Cache is {hours:.1f} hours old - consider running refresh_cache.py for fresher data.\n"
-    return ""
+        note += f"NOTE: Cache last refreshed {hours:.1f} hours ago - consider running refresh_cache.py.\n"
+    return note
 
 
 def get_news(ticker, max_headlines=3):
@@ -148,7 +159,7 @@ def get_swing_levels_short(ticker, stock_df=None):
     support = stock_df['low'].tail(20).min()
     resistance = stock_df['high'].tail(20).max()
 
-    stop_loss = current_price - (2 * atr)
+    stop_loss = current_price - (SHORT_STOP_ATR_MULT * atr)
     target_1 = current_price + (2 * atr)
     target_2 = current_price + (3.5 * atr)
 
@@ -309,7 +320,7 @@ def get_snapshot_text_long(ticker):
         text += f"60-day Support: ₹{levels['support_60d']}\n"
         text += f"60-day Resistance: ₹{levels['resistance_60d']}\n"
         text += f"Recent news: {'; '.join(news)}\n"
-        text += f"Relative Strength vs Nifty: {levels['relative_strength_pct']}% ({'outperforming' if levels['outperforming_market'] else 'underperforming'} the broader market)\n"
+        text += f"Relative Strength vs Nifty: {levels['relative_strength_pct']}% ({label_rel_strength(levels['relative_strength_pct'])} the broader market)\n"
         text += f"Industry: {levels.get('industry', 'Unknown')} | Sector avg 60d momentum: {fmt_pct(levels.get('sector_avg_momentum_60d'))} | This stock vs sector: {fmt_pct(levels.get('sector_relative_strength'))} ({'outperforming peers' if levels.get('outperforming_sector') else 'in line with or behind peers'})\n"
         return text
     except Exception as e:
@@ -402,6 +413,75 @@ def label_profit_margin(value):
         return "Thin"
 
 
+def label_growth(value):
+    """YoY revenue/earnings growth, in %. Directional, not advice."""
+    if value is None:
+        return "N/A"
+    if value < 0:
+        return "declining"
+    elif value < 10:
+        return "modest"
+    elif value < 25:
+        return "strong"
+    else:
+        return "very strong"
+
+
+def label_pe(value):
+    """P/E as valuation (how expensive vs earnings). Cheap can also mean a troubled business,
+    and 'fair' P/E varies a lot by sector - so this describes price, not quality."""
+    if value is None or value <= 0:
+        return "N/A - no positive earnings"
+    if value < 15:
+        return "cheap"
+    elif value < 30:
+        return "moderate"
+    elif value < 60:
+        return "expensive"
+    else:
+        return "very expensive"
+
+
+def label_breadth(pct):
+    """% of stocks above their 200-day average = how much of the market is in an uptrend."""
+    if pct is None:
+        return "N/A"
+    if pct < 40:
+        return "weak - most stocks below trend"
+    elif pct < 60:
+        return "mixed"
+    else:
+        return "healthy - most stocks in uptrend"
+
+
+def label_delivery(pct):
+    """Absolute delivery %: how much of the volume was bought to hold vs day-traded."""
+    if pct is None:
+        return "N/A"
+    if pct > 60:
+        return "high - genuine accumulation"
+    elif pct >= 40:
+        return "moderate"
+    else:
+        return "low - mostly intraday churn"
+
+
+def label_rel_strength(pct):
+    """Magnitude of out/under-performance vs a benchmark, in percentage points."""
+    if pct is None:
+        return "N/A"
+    if pct > 15:
+        return "strongly outperforming"
+    elif pct > 3:
+        return "outperforming"
+    elif pct >= -3:
+        return "roughly in line with"
+    elif pct >= -15:
+        return "underperforming"
+    else:
+        return "strongly underperforming"
+
+
 def get_fundamentals_text(ticker):
     fund = get_fundamentals(ticker)
     if 'error' in fund:
@@ -412,9 +492,9 @@ def get_fundamentals_text(ticker):
         text += f"Business Description (verified, from company filings): {fund['business_summary']}\n"
     else:
         text += "Business Description: Not available - do not guess or invent what this company does.\n"
-    text += f"P/E Ratio: {fund['trailing_pe']}\n" if fund['trailing_pe'] else "P/E Ratio: N/A\n"
-    text += f"Revenue Growth (YoY): {fund['revenue_growth_pct']}%\n" if fund['revenue_growth_pct'] is not None else ""
-    text += f"Earnings Growth (YoY): {fund['earnings_growth_pct']}%\n" if fund['earnings_growth_pct'] is not None else ""
+    text += f"P/E Ratio: {fund['trailing_pe']} ({label_pe(fund['trailing_pe'])})\n" if fund['trailing_pe'] else "P/E Ratio: N/A\n"
+    text += f"Revenue Growth (YoY): {fund['revenue_growth_pct']}% ({label_growth(fund['revenue_growth_pct'])})\n" if fund['revenue_growth_pct'] is not None else ""
+    text += f"Earnings Growth (YoY): {fund['earnings_growth_pct']}% ({label_growth(fund['earnings_growth_pct'])})\n" if fund['earnings_growth_pct'] is not None else ""
     text += f"Profit Margin: {fund['profit_margin_pct']}% ({label_profit_margin(fund['profit_margin_pct'])})\n" if fund['profit_margin_pct'] is not None else ""
     text += f"ROE: {fund['roe_pct']}% ({label_roe(fund['roe_pct'])})\n" if fund['roe_pct'] is not None else ""
     text += f"Debt-to-Equity: {fund['debt_to_equity']} ({label_debt_to_equity(fund['debt_to_equity'])} leverage)\n" if fund['debt_to_equity'] is not None else ""
@@ -436,7 +516,7 @@ def get_institutional_activity_text(ticker):
             latest_delivery = match.sort_values('DATE_FETCHED').iloc[-1]['DELIV_PER']
             if pd.notna(latest_delivery):
                 trend = "above average" if latest_delivery > avg_delivery else "below average"
-                text += f"Delivery %: {latest_delivery:.2f}% latest, {avg_delivery:.2f}% avg over last {len(match)} trading days ({trend})\n\n"
+                text += f"Delivery %: {latest_delivery:.2f}% latest ({label_delivery(latest_delivery)}), {avg_delivery:.2f}% avg over last {len(match)} trading days ({trend})\n\n"
             else:
                 text += "Delivery %: latest value unavailable.\n\n"
         else:
@@ -460,7 +540,7 @@ def get_market_regime_text():
     try:
         breadth = load_market_breadth_cache()
         text = f"Market Regime: {breadth['regime']}\n"
-        text += f"Breadth: {breadth['breadth_pct_above_200sma']}% of watchlist stocks are above their 200-day average\n"
+        text += f"Breadth: {breadth['breadth_pct_above_200sma']}% of watchlist stocks are above their 200-day average ({label_breadth(breadth['breadth_pct_above_200sma'])})\n"
         text += f"Nifty above its own 200-day average: {'Yes' if breadth['nifty_above_200sma'] else 'No'}\n"
 
         try:
@@ -1013,7 +1093,7 @@ def _universe_verdict(ticker, levels, source):
     turn_cr = levels.get('turnover_60d_cr')
     fails = []
     if source == 'live':
-        fails.append("not in the 748-stock universe (fetched live, no cap-tier or model data)")
+        fails.append("not in the backtested universe (fetched live, no cap-tier or model data)")
     if cap not in ('Mid', 'Small'):
         fails.append(f"cap tier is {cap}, and the edge was only demonstrated in Mid/Small")
     if rsi is None or rsi >= 30:
@@ -1073,13 +1153,13 @@ def evaluate_user_trade(ticker, entry_price=None, shares=None):
 
     if entry_price is not None and entry_price > 0:
         pnl = (price_now - entry_price) / entry_price * 100
-        stop = entry_price - 2 * atr
+        stop = entry_price - SHORT_STOP_ATR_MULT * atr
         t1, t2 = entry_price + 2 * atr, entry_price + 3.5 * atr
         rr = (t1 - entry_price) / (entry_price - stop) if entry_price > stop else 0
         out += ["",
                 f"AGAINST YOUR ENTRY of Rs{entry_price}:",
                 f"  Unrealised: {pnl:+.2f}%",
-                f"  Stop (2xATR from YOUR entry): Rs{round(stop, 2)}  "
+                f"  Stop ({SHORT_STOP_ATR_MULT:g}xATR from YOUR entry): Rs{round(stop, 2)}  "
                 f"({(stop - price_now) / price_now * 100:+.1f}% from here)",
                 f"  Target 1 (2xATR): Rs{round(t1, 2)} | Target 2 (3.5xATR): Rs{round(t2, 2)}",
                 f"  Reward:risk at target 1: {rr:.2f} : 1"]
@@ -1091,11 +1171,12 @@ def evaluate_user_trade(ticker, entry_price=None, shares=None):
                        f"invested, Rs{round(risk, 2)} at risk to the stop "
                        f"(tell me your capital and I can check that against your risk %).")
     else:
-        stop = price_now - 2 * atr
+        stop = price_now - SHORT_STOP_ATR_MULT * atr
         out += ["",
                 f"IF ENTERING NOW at Rs{price_now}: stop Rs{round(stop, 2)}, "
                 f"target 1 Rs{round(price_now + 2 * atr, 2)}, "
-                f"target 2 Rs{round(price_now + 3.5 * atr, 2)} (2x/3.5x ATR)"]
+                f"target 2 Rs{round(price_now + 3.5 * atr, 2)} "
+                f"({SHORT_STOP_ATR_MULT:g}xATR stop, 2x/3.5x ATR targets)"]
 
     if source == 'cache':
         out += ["", "--- full checklist ---", get_full_analysis(ticker, term="short")]
@@ -1487,7 +1568,7 @@ TOOL_DEFINITIONS = [
             "USE THIS whenever the user names a stock THEY are interested in or have already bought, "
             "rather than one the scan surfaced - e.g. 'I bought 5 shares of XYZ at 400', 'what do you "
             "think of ABC', 'is RELIANCE a good buy'. Works for ANY NSE ticker including ones outside "
-            "the 748-stock universe. Pass entry_price and shares whenever the user mentions them. "
+            "the backtested universe. Pass entry_price and shares whenever the user mentions them. "
             "It states explicitly whether the backtested edge applies to the setup - when it says no "
             "edge applies, relay that clearly and do NOT quote strategy statistics as if they covered "
             "this trade."),

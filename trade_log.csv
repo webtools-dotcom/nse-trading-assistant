@@ -1,3 +1,0 @@
-trade_id,ticker,term,entry_date,entry_price,stop_loss,target,shares,capital_used,risk_pct,rsi_at_entry,model_signal_at_entry,volume_spike_at_entry,momentum_60d_at_entry,validated_setup_at_entry,extreme_momentum_at_entry,relative_strength_nifty_at_entry,sector_relative_strength_at_entry,market_regime_at_entry,status,exit_date,exit_price,exit_type,return_pct,holding_days
-CUPID.NS_20260810230052,CUPID.NS,long,2026-08-05,244.73,231.94,292.45,7,1713.11,,76.1,5.02,,106.4,True,True,102.6,112.1,Mixed/Neutral,open,,,,,
-CEMPRO.NS_20260810230054,CEMPRO.NS,short,2026-08-10,1206.3,1127.15,1405.65,1,1206.3,,38.4,2.57,False,,,,,,,open,,,,,

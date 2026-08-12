@@ -25,16 +25,18 @@ def bucket(rank):
 
 
 def main():
-    print("Fetching Nifty 500 list...")
-    nifty500_df = fetch_index_list("https://www.niftyindices.com/IndexConstituent/ind_nifty500list.csv")
-    nifty500_df['ticker'] = nifty500_df['Symbol'].str.strip() + ".NS"
+    print("Fetching Nifty Total Market (~750) list...")
+    # Widened from Nifty 500 to Nifty Total Market (2026-08-11) to pull in liquid mid/small caps
+    # ranked ~500-750 by mcap that were outside the 500 - the only expansion with validated edge.
+    index_df = fetch_index_list("https://www.niftyindices.com/IndexConstituent/ind_niftytotalmarket_list.csv")
+    index_df['ticker'] = index_df['Symbol'].str.strip() + ".NS"
 
     # Your existing microcap/smallcap list, already built earlier
     existing_df = pd.read_csv('nse_watchlist_full.csv')
 
     combined = pd.concat([
         existing_df[['Company Name', 'Industry', 'Symbol', 'ticker']],
-        nifty500_df[['Company Name', 'Industry', 'Symbol', 'ticker']]
+        index_df[['Company Name', 'Industry', 'Symbol', 'ticker']]
     ], ignore_index=True)
     combined = combined.drop_duplicates(subset='Symbol').reset_index(drop=True)
 

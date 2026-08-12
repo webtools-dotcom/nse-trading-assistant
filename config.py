@@ -30,6 +30,15 @@ LONG_HORIZON_DAYS = 20
 LONG_STOP_PCT = 0.08
 LONG_TARGET_PCT = 0.16
 
+# Short-term stop width, in ATR multiples. Widened 2.0 -> 4.0 on 2026-08-11 after backtest_exits.py
+# showed the tighter stop realises the very dip a mean-reversion trade bets will revert: net/trade
+# rose monotonically 2x +0.53% -> 4x +0.70% (z_paired held ~3.2), robust in 4 of 5 chronological
+# periods. 4x (not none) keeps a real catastrophic stop the mean-return table cannot see the need
+# for. Targets are unchanged (2x / 3.5x ATR). Only NEW setups use this; open trades keep their
+# frozen entry stop. NOTE: the P(win) meta-model was trained on 2x-stop outcomes, so displayed
+# net-EV corresponds to the old exit - conservative here, since 4x was validated to improve net.
+SHORT_STOP_ATR_MULT = 4.0
+
 DEFAULT_CAPITAL = 10000
 DEFAULT_RISK_PCT = 2
 MAX_RISK_PCT = 2.0
@@ -99,7 +108,7 @@ GROSS_EDGE_LONG_PCT = 2.50      # momentum setup, ~1 month hold (rougher estimat
 # Mean reversion needs panic to revert from. In a calm market an RSI<30 reading is more often
 # something genuinely wrong with the stock than a market overreaction. NOTE this is the
 # OPPOSITE of standard volatility targeting, which is written for trend-following.
-# Per-trade stock volatility is already handled - position size is risk/(2*ATR).
+# Per-trade stock volatility is already handled - position size is risk/(SHORT_STOP_ATR_MULT*ATR).
 VOL_REGIME_SIZING = [
     (0.75, 1.00, "high market volatility - the regime this strategy is built for"),
     (0.50, 0.75, "moderate market volatility - reduced size"),
@@ -324,8 +333,8 @@ SHARED_RULES = (
     "LIQUIDITY FILTER: scans exclude stocks below Rs 25 crore median daily turnover. This IS validated - "
     "5-year walk-forward, point-in-time turnover, costs charged: the filtered universe beat the unfiltered "
     "one in all 5 chronological folds (+0.564% vs +0.259% net per trade), and the result survives a Deflated "
-    "Sharpe test over the full 20-config search. Illiquid names have roughly half the gross edge and triple "
-    "the impact cost, so they are net-negative. "
+    "Sharpe test over the full 20-config search. Illiquid names have COMPARABLE gross edge but ~3x the "
+    "impact cost, so they are net-negative purely on cost, not on a weaker signal. "
     "OVERSOLD DEPTH: edge scales monotonically with how deeply oversold a stock is, net of costs - "
     "RSI<24 +1.17%/trade, 24-26 +0.77%, 26-28 +0.50%, 28-30 +0.27%, 30-35 +0.10%. A candidate with RSI just "
     "under 30 barely clears costs; say so rather than presenting it as equivalent to a deeply oversold name. "

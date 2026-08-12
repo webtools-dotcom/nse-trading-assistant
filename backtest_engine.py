@@ -34,7 +34,8 @@ from config import round_trip_cost_pct
 # ============================================================
 
 def simulate_trades(stock_df, entry_mask, horizon_days=6, stop_atr_mult=2.0,
-                    target_atr_mult=2.0, charge_costs=True, allow_overlap=False):
+                    target_atr_mult=2.0, charge_costs=True, allow_overlap=False,
+                    exit_rsi=None):
     """Simulate trades for one stock.
 
     entry_mask: boolean array aligned to stock_df rows.
@@ -42,6 +43,11 @@ def simulate_trades(stock_df, entry_mask, horizon_days=6, stop_atr_mult=2.0,
 
     allow_overlap=False (the default, and the honest one) takes at most one trade per
     signal episode - no new entry until the previous trade has exited.
+
+    exit_rsi (None = off): if set, the trade also exits when RSI recovers to this level,
+    filled on the NEXT open. This is the mean-reversion exit - it bets the trade's thesis
+    (a temporary oversold dip) is spent once RSI is back up. Stop and target still take
+    priority within a bar; the time exit becomes only a backstop for dips that never revert.
     """
     df = stock_df.reset_index(drop=True)
     mask = np.asarray(entry_mask)
@@ -51,6 +57,7 @@ def simulate_trades(stock_df, entry_mask, horizon_days=6, stop_atr_mult=2.0,
     low = df['low'].values
     open_ = df['open'].values if 'open' in df.columns else close
     atr = df['atr'].values
+    rsi = df['rsi'].values if 'rsi' in df.columns else None
 
     turnover = None
     if 'turnover_60d' in df.columns:
@@ -83,6 +90,16 @@ def simulate_trades(stock_df, entry_mask, horizon_days=6, stop_atr_mult=2.0,
             # Conservative: if both barriers are touched intrabar, assume the stop hit first.
             if high[k] >= target:
                 exit_price, reason, held = target, 'target', j
+                break
+            # RSI recovered to the exit level: the reversion this trade bet on has played out.
+            # Fill on the NEXT open - RSI is only known at this bar's close, so exiting at that
+            # same close would be look-ahead.
+            if exit_rsi is not None and rsi is not None and np.isfinite(rsi[k]) and rsi[k] >= exit_rsi:
+                nxt = i + j + 1
+                if nxt < n:
+                    exit_price, reason, held = open_[nxt], 'rsi_recover', j + 1
+                else:
+                    exit_price, reason, held = close[k], 'rsi_recover', j
                 break
         if exit_price is None:
             exit_price, reason, held = close[i + horizon_days], 'time', horizon_days
@@ -458,6 +475,11 @@ def demo():
     paid = simulate_trades(df, m, charge_costs=True)
     assert all(abs((f['gross_pct'] - p['net_pct']) - p['cost_pct']) < 1e-9 for f, p in zip(free, paid))
     assert paid[0]['cost_pct'] > 0, "costs were not charged"
+
+    # 5b. The RSI-recovery exit must actually fire and be labelled (an oversold-bounce synthetic
+    #     recovers RSI within the horizon, so at least one trade should exit on it).
+    rsi_ex = simulate_trades(df, m, charge_costs=False, exit_rsi=45)
+    assert any(t['reason'] == 'rsi_recover' for t in rsi_ex), "exit_rsi branch never fired"
 
     # 6. Deflated Sharpe must reject the best of many pure-noise trials.
     noise_srs = [sharpe(rng.normal(0, 6, 400), holding_days=6) for _ in range(200)]

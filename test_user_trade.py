@@ -35,7 +35,7 @@ def test_every_disqualifier_is_stated():
         (_levels(turnover_60d_cr=MIN_TURNOVER_INR / 1e7 - 1), 'cache', 'below the Rs25cr floor'),
         (_levels(trend_tier='Downtrend'), 'cache', 'Downtrend'),
         (_levels(cap_bucket='Mid'), 'cache', 'Mid-cap'),
-        (_levels(cap_bucket='Unknown'), 'live', '748-stock universe'),
+        (_levels(cap_bucket='Unknown'), 'live', 'backtested universe'),
     ]
     for levels, source, expect in cases:
         v = _universe_verdict('X.NS', levels, source)

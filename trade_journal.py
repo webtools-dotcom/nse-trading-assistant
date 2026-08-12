@@ -94,7 +94,15 @@ def log_trade_entry(ticker, term, shares, capital_used, risk_pct, levels, market
     return trade_id
 
 
-def log_trade_exit(ticker, exit_price):
+def log_trade_exit(ticker, exit_price, shares=None, exit_date=None):
+    """Closes a position. `shares` sells only part of it.
+
+    Scaling out is normal, and without partial support the only options were to mark the whole
+    position closed (losing the shares still held, so the exit monitor stops watching them) or
+    to leave it fully open (pretending nothing was sold). A partial exit splits the row: the
+    sold portion becomes a closed trade with its own return, the remainder stays open and keeps
+    its original entry price, date, stop and target.
+    """
     df = _load_log()
     open_trades = df[(df['ticker'] == ticker) & (df['status'] == 'open')]
 
@@ -104,13 +112,32 @@ def log_trade_exit(ticker, exit_price):
     idx = _parse_date(open_trades['entry_date']).sort_values().index[-1]
     row = df.loc[idx]
 
+    held = float(row['shares']) if pd.notna(row.get('shares')) else None
+    partial = None
+    if shares is not None and held is not None:
+        if shares > held:
+            return {'error': f"You hold {held:.0f} share(s) of {ticker}, cannot sell {shares:.0f}."}
+        if shares < held:
+            partial = {'sold': float(shares), 'remaining': held - float(shares)}
+            keep = row.copy()
+            keep['trade_id'] = f"{row['trade_id']}_rem"
+            keep['shares'] = partial['remaining']
+            if pd.notna(row.get('capital_used')) and held:
+                keep['capital_used'] = round(float(row['capital_used']) * partial['remaining'] / held, 2)
+            df = pd.concat([df, pd.DataFrame([keep])], ignore_index=True)
+            df.loc[idx, 'shares'] = partial['sold']
+            if pd.notna(row.get('capital_used')) and held:
+                df.loc[idx, 'capital_used'] = round(float(row['capital_used']) * partial['sold'] / held, 2)
+
     entry_price = float(row['entry_price'])
     stop_loss = float(row['stop_loss']) if pd.notna(row['stop_loss']) else None
     target = float(row['target']) if pd.notna(row['target']) else None
 
     return_pct = ((exit_price - entry_price) / entry_price) * 100
     entry_date = _parse_date(row['entry_date'])
-    holding_days = int(np.busday_count(entry_date.date(), datetime.now().date())) if pd.notna(entry_date) else None
+    exit_dt = _parse_date(exit_date) if exit_date else pd.Timestamp(datetime.now())
+    holding_days = (int(np.busday_count(entry_date.date(), exit_dt.date()))
+                    if pd.notna(entry_date) else None)
 
     if stop_loss is not None and exit_price <= stop_loss * 1.01:
         exit_type = 'stop_loss'
@@ -120,17 +147,22 @@ def log_trade_exit(ticker, exit_price):
         exit_type = 'manual_exit'
 
     df.loc[idx, 'status'] = 'closed'
-    df.loc[idx, 'exit_date'] = datetime.now().strftime('%Y-%m-%d')
+    df.loc[idx, 'exit_date'] = exit_date or datetime.now().strftime('%Y-%m-%d')
     df.loc[idx, 'exit_price'] = exit_price
     df.loc[idx, 'exit_type'] = exit_type
     df.loc[idx, 'return_pct'] = round(return_pct, 2)
     df.loc[idx, 'holding_days'] = holding_days
 
     _save_log(df)
-    return {
+    out = {
         'ticker': ticker, 'entry_price': entry_price, 'exit_price': exit_price,
         'return_pct': round(return_pct, 2), 'exit_type': exit_type, 'holding_days': holding_days
     }
+    if partial:
+        out.update({'shares_sold': partial['sold'], 'shares_remaining': partial['remaining'],
+                    'note': (f"Partial exit: {partial['sold']:.0f} sold, "
+                             f"{partial['remaining']:.0f} still open and still monitored.")})
+    return out
 
 def get_open_positions():
     df = _load_log()

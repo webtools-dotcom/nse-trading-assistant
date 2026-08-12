@@ -129,6 +129,25 @@ def get_cache_age():
     return age
 
 
+def newest_short_data_date():
+    """Newest bar date across the short price cache - the actual DATA vintage (not file age).
+    Yahoo's NSE feed can lag, so a fresh refresh can still hold stale prices; this catches that."""
+    cache = load_price_cache_short()
+    if not cache:
+        return None
+    dates = [df['date'].max() for df in cache.values() if len(df)]
+    return max(dates) if dates else None
+
+
+def get_data_date():
+    """Newest price-bar date recorded at the last refresh, or None if not recorded yet."""
+    if not os.path.exists(CACHE_META_FILE):
+        return None
+    with open(CACHE_META_FILE, 'rb') as f:
+        meta = pickle.load(f)
+    return meta.get('newest_data_date')
+
+
 def load_bulk_deals_cache():
     return _load_pickle(BULK_DEALS_CACHE_FILE, "bulk deals")
 
