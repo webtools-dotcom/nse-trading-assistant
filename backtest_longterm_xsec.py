@@ -3,8 +3,9 @@ overlay. A TRUE fundamental-quality filter (ROE/debt) needs historical point-in-
 the panel does not have - that is a LIVE filter, not backtestable here (see long-term-fix.md).
 
 Each date: rank Mid/Small liquid stocks by 12M-1M momentum (close[t-21]/close[t-252]-1). Take the
-top decile, hold H=20 days, net of costs. Day-clustered against the SAME-day mean of the whole
-liquid universe (the honest control for a cross-sectional sort).
+top decile, ENTER AT THE NEXT SESSION'S OPEN (the screen runs after close, so signal-day close is
+unbuyable look-ahead - see backtest_nextopen_entry.py), hold H=20 days, net of costs. Day-clustered
+against the SAME-day mean of the whole liquid universe (the honest control for a cross-sectional sort).
 
     python backtest_longterm_xsec.py
 """
@@ -29,16 +30,17 @@ def build_rows():
         if len(df) < 300:
             continue
         c = df['close'].values
+        o = df['open'].values
         turn = df['turnover_60d'].values
         n = len(c)
         vol = pd.Series(c).rolling(10).std().values
         mom = np.full(n, np.nan)
         fwd = np.full(n, np.nan)
-        for i in range(252, n - H):
+        for i in range(252, n - H - 1):
             if c[i - 252] > 0:
                 mom[i] = c[i - 21] / c[i - 252] - 1
-            if c[i] > 0:
-                fwd[i] = (c[i + H] - c[i]) / c[i] * 100 - round_trip_cost_pct(turn[i])
+            if o[i + 1] > 0:  # enter next open, exit close[i+1+H] - no signal-day-close look-ahead
+                fwd[i] = (c[i + 1 + H] - o[i + 1]) / o[i + 1] * 100 - round_trip_cost_pct(turn[i])
         rows.append(pd.DataFrame({'date': df['date'].values, 'ticker': t, 'mom': mom,
                                   'vol': vol, 'fwd': fwd, 'turn': turn}))
     a = pd.concat(rows).dropna(subset=['mom', 'fwd'])
