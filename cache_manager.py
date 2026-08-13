@@ -57,10 +57,43 @@ def refresh_price_cache_long(tickers):
             missing.append(ticker)
 
     all_features = _retry_missing(missing, all_features, add_long_features, "long")
+    return _save_price_cache_no_regress(all_features, PRICE_CACHE_FILE_LONG, "long-term")
 
-    with open(PRICE_CACHE_FILE_LONG, 'wb') as f:
+
+def _newest_bar_date(all_features):
+    """Latest 'date' across a dict of feature frames, or None if empty."""
+    dates = [df['date'].iloc[-1] for df in all_features.values() if len(df)]
+    return max(dates) if dates else None
+
+
+def _save_price_cache_no_regress(all_features, cache_file, label):
+    """Overwrite the price cache ONLY if the new pull is at least as fresh as what's cached.
+
+    Yahoo posts NSE daily bars late and sometimes serves data a full session behind. A blind
+    overwrite lets a stale night-time refresh clobber correct end-of-day prices with older ones
+    (the '10pm refresh pulls 2-day-old data' problem). This guard makes refreshes monotonic:
+    they can move the newest bar forward or update the current day, never backward.
+    ponytail: global newest-date guard; a per-ticker merge would be finer but Yahoo lag is
+    systemic (all .NS regress together), so the global check covers the real failure mode.
+    """
+    new_date = _newest_bar_date(all_features)
+    if os.path.exists(cache_file):
+        try:
+            with open(cache_file, 'rb') as f:
+                old = pickle.load(f)
+            old_date = _newest_bar_date(old)
+        except Exception:
+            old_date = None
+        if new_date is not None and old_date is not None and new_date < old_date:
+            print(f"  KEEPING existing {label} cache: fresh pull is stale "
+                  f"(newest {str(new_date)[:10]} < cached {str(old_date)[:10]}). "
+                  f"Yahoo likely hasn't posted the latest bar yet - re-run later.")
+            return old
+
+    with open(cache_file, 'wb') as f:
         pickle.dump(all_features, f)
-    print(f"Long-term price cache saved: {len(all_features)}/{len(tickers)} stocks")
+    print(f"{label.capitalize()} price cache saved: {len(all_features)} stocks"
+          f" (newest bar {str(new_date)[:10]})")
     return all_features
 
 
@@ -269,11 +302,7 @@ def refresh_price_cache_short(tickers):
             missing.append(ticker)
 
     all_features = _retry_missing(missing, all_features, add_short_features, "short")
-
-    with open(PRICE_CACHE_FILE_SHORT, 'wb') as f:
-        pickle.dump(all_features, f)
-    print(f"Short-term price cache saved: {len(all_features)}/{len(tickers)} stocks")
-    return all_features
+    return _save_price_cache_no_regress(all_features, PRICE_CACHE_FILE_SHORT, "short-term")
 
 
 def load_price_cache_short():
