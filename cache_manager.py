@@ -7,7 +7,13 @@ import pickle
 import os
 import time
 import nsefin
+import logging
 from features import add_short_features, add_long_features, MIN_BARS
+
+# yfinance logs a "possibly delisted" line PER ticker on every rate-limit hit -- pure
+# noise, since the batch retry pass recovers them. Mute its logger; our own
+# "recovered X, still missing Y" prints report the real outcome.
+logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
 CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
 PRICE_CACHE_FILE_SHORT = os.path.join(CACHE_DIR, "price_data_short.pkl")
@@ -454,7 +460,17 @@ def chunked_download(tickers, chunk_size=100, **kwargs):
 def refresh_vix_cache():
     """Caches India VIX - the market's own measure of expected volatility/fear."""
     print("Downloading India VIX data...")
-    df = yf.download("^INDIAVIX", period="6mo", interval="1d", progress=False, auto_adjust=True)
+    df = None
+    for attempt in range(3):  # single ticker, no batch retry pass -> retry here
+        df = yf.download("^INDIAVIX", period="6mo", interval="1d", progress=False, auto_adjust=True)
+        if not df.empty:
+            break
+        if attempt < 2:
+            time.sleep(5)
+    if df is None or df.empty:
+        # rate-limited on every attempt: keep the last good cache, don't clobber it
+        print("VIX: no data after 3 attempts (rate-limited); keeping existing cache")
+        return load_vix_cache()
     df.columns = df.columns.get_level_values(0)
     df = df.reset_index()
     df.columns = [str(c).lower() for c in df.columns]
@@ -466,7 +482,7 @@ def refresh_vix_cache():
 def load_vix_cache():
     return _load_pickle(VIX_CACHE_FILE, "VIX")
 
-def refresh_corp_announcements_cache(tickers, days_back=5):
+def refresh_corp_announcements_cache(tickers, days_back=8):  # must exceed DILUTION_LOOKBACK_DAYS (7)
     """Caches recent corporate announcements filtered to the watchlist - whole-market volume is too large to cache in full."""
     nse = nsefin.NSEClient()
     symbols = set(t.replace(".NS", "") for t in tickers)
