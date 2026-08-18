@@ -3,6 +3,7 @@ from cache_manager import (
     update_delivery_history, refresh_bulk_deals_cache, refresh_upcoming_results_cache,
     refresh_nifty_cache, refresh_sector_relative_strength, refresh_market_breadth,
     refresh_vix_cache, refresh_corp_announcements_cache, update_category_flows,
+    refresh_market_ui_cache,
     newest_short_data_date, CACHE_DIR, CACHE_META_FILE,
 )
 from config import WATCHLIST
@@ -21,6 +22,7 @@ STEPS = [
     ("vix", refresh_vix_cache),
     ("corp_announcements", lambda: refresh_corp_announcements_cache(WATCHLIST)),
     ("category_flows", update_category_flows),
+    ("market_ui", refresh_market_ui_cache),
 ]
 
 MIN_COVERAGE = 0.95  # below this, the universe is too thin to trust a scan

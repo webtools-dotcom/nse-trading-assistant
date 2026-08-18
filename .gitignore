@@ -5,3 +5,6 @@ __pycache__/
 .env
 conversations/
 trade_log.csv
+graphify.env
+graphify-out/
+.claude/settings.local.json

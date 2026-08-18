@@ -16,19 +16,36 @@ def add_short_features(stock_df):
     macd = ta.trend.MACD(close=stock_df['close'])
     stock_df['macd'] = macd.macd()
     stock_df['macd_signal'] = macd.macd_signal()
+    stock_df['ema_10'] = ta.trend.EMAIndicator(close=stock_df['close'], window=10).ema_indicator()
+    stock_df['ema_20'] = ta.trend.EMAIndicator(close=stock_df['close'], window=20).ema_indicator()
     stock_df['sma_20'] = ta.trend.SMAIndicator(close=stock_df['close'], window=20).sma_indicator()
     stock_df['sma_50'] = ta.trend.SMAIndicator(close=stock_df['close'], window=50).sma_indicator()
+    stock_df['sma_200'] = ta.trend.SMAIndicator(close=stock_df['close'], window=200).sma_indicator()
     stock_df['volume_change'] = stock_df['volume'].pct_change()
     stock_df['price_change'] = stock_df['close'].pct_change()
     # median beats mean here - one block deal shouldn't make an illiquid stock look tradeable
     stock_df['turnover_60d'] = (stock_df['close'] * stock_df['volume']).rolling(60).median()
     stock_df['volatility_10'] = stock_df['close'].rolling(10).std()
     stock_df['distance_from_high_50'] = (stock_df['close'] / stock_df['close'].rolling(50).max()) - 1
+    stock_df['dist_from_high_252'] = (stock_df['close'] / stock_df['close'].rolling(252).max()) - 1
+    stock_df['momentum_60d'] = stock_df['close'].pct_change(60) * 100
     stock_df['change_252d'] = stock_df['close'].pct_change(252) * 100
 
     atr_indicator = ta.volatility.AverageTrueRange(high=stock_df['high'], low=stock_df['low'], close=stock_df['close'], window=14)
     stock_df['atr'] = atr_indicator.average_true_range()
     stock_df['atr_pct'] = (stock_df['atr'] / stock_df['close']) * 100
+
+    # Breakout / VCP Volatility Contraction indicators
+    atr_5_ind = ta.volatility.AverageTrueRange(high=stock_df['high'], low=stock_df['low'], close=stock_df['close'], window=5)
+    atr_20_ind = ta.volatility.AverageTrueRange(high=stock_df['high'], low=stock_df['low'], close=stock_df['close'], window=20)
+    stock_df['atr_5'] = atr_5_ind.average_true_range()
+    stock_df['atr_20'] = atr_20_ind.average_true_range()
+    stock_df['vcp_ratio'] = stock_df['atr_5'] / stock_df['atr_20']
+    stock_df['base_high_5d'] = stock_df['high'].rolling(5).max()
+    stock_df['base_low_5d'] = stock_df['low'].rolling(5).min()
+    stock_df['base_depth_pct'] = ((stock_df['base_high_5d'] - stock_df['base_low_5d']) / stock_df['base_high_5d']) * 100
+    vol_sma_20 = stock_df['volume'].rolling(20).mean()
+    stock_df['rvol'] = stock_df['volume'] / vol_sma_20.replace(0, np.nan)
 
     return _scrub(stock_df)
 

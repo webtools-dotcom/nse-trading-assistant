@@ -8,6 +8,8 @@ Run after build_universe.py whenever the universe changes:
     python build_backtest_panel.py
 """
 
+import os
+import sys
 import pickle
 
 from config import WATCHLIST
@@ -17,7 +19,32 @@ from features import add_short_features, MIN_BARS
 OUT = "cache/backtest_5y_short.pkl"
 
 
-def build():
+def build(fresh=False):
+    if not fresh and os.path.exists(OUT):
+        print(f"Loading existing {OUT} to recompute new feature columns...")
+        with open(OUT, 'rb') as f:
+            old_panel = pickle.load(f)
+        panel = {}
+        for ticker, df in old_panel.items():
+            try:
+                base_df = df[['date', 'open', 'high', 'low', 'close', 'volume']].copy() if 'open' in df.columns else df.copy()
+                base_df = base_df.dropna(subset=['close'])
+                if len(base_df) < MIN_BARS:
+                    continue
+                feat = add_short_features(base_df)
+                feat['ticker'] = ticker
+                panel[ticker] = feat
+            except Exception as e:
+                print(f"Error updating features for {ticker}: {e}")
+        with open(OUT, 'wb') as f:
+            pickle.dump(panel, f)
+        print(f"Saved updated {OUT}: {len(panel)}/{len(WATCHLIST)} stocks")
+        if panel:
+            s = next(iter(panel.values()))
+            print(f"  columns: {list(s.columns)}")
+            print(f"  history: {s['date'].min().date()} -> {s['date'].max().date()}, ~{len(s)} bars/stock")
+        return
+
     print(f"Downloading 5y SHORT-TERM data for {len(WATCHLIST)} stocks (chunked)...")
     raw = chunked_download(WATCHLIST, chunk_size=100, period="5y", interval="1d", auto_adjust=True)
 
@@ -49,4 +76,5 @@ def build():
 
 
 if __name__ == "__main__":
-    build()
+    fresh = "--fresh" in sys.argv
+    build(fresh=fresh)

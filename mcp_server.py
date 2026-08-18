@@ -2,13 +2,13 @@ from typing import Optional
 import json
 from mcp.server.fastmcp import FastMCP
 from tools import (
-    scan_watchlist_text_short, scan_watchlist_text_long, scan_watchlist_text_long_momentum, get_full_analysis,
+    scan_watchlist_text_breakout, scan_watchlist_text_short, scan_watchlist_text_long, scan_watchlist_text_long_momentum, get_full_analysis,
     calculate_position_size, get_exit_check_text, get_similar_past_trades,
     record_trade_entry, record_trade_exit, get_significant_announcements_scan,
     get_upcoming_catalysts_scan, get_market_regime_text, get_open_positions,
     get_fundamentals_text, get_institutional_activity_text, check_upcoming_results,
     get_recent_announcements_text, get_announcement_reaction_text, get_catalyst_scan_text,
-    get_snapshot_text_short, get_snapshot_text_long, get_live_price_text,
+    get_snapshot_text_short, get_snapshot_text_long, get_snapshot_text_breakout, get_live_price_text,
     evaluate_user_trade,
 )
 from trade_journal import get_strategy_health
@@ -19,8 +19,14 @@ mcp = FastMCP("NSE Trading Assistant", instructions=SHARED_RULES)
 
 @mcp.tool()
 def scan_short_term(rsi_threshold: int = 30, limit: int = 30) -> str:
-    """Scans the NSE watchlist for 4-6 day swing setups using the backtested RSI<30 strategy (z-score 8.08). Automatically excludes large-cap stocks, which showed no reliable edge."""
+    """Scans the NSE watchlist for 4-6 day swing setups using the backtested RSI<30 strategy (z-score 8.08, day-clustered Small z 2.74). Automatically excludes large-cap stocks, which showed no reliable edge."""
     return scan_watchlist_text_short(limit, rsi_threshold)
+
+
+@mcp.tool()
+def scan_breakout_swings(limit: int = 10) -> str:
+    """EXPERIMENTAL / UNVALIDATED scan for Momentum Breakout setups (VCP / High Tight Base) in Mid/Small caps. 5-year backtest failed to demonstrate edge (z_paired < 2.0 across all cap tiers). Informational only, not a validated buy signal."""
+    return scan_watchlist_text_breakout(limit)
 
 
 @mcp.tool()
@@ -31,7 +37,7 @@ def scan_long_term(limit: int = 15) -> str:
 
 @mcp.tool()
 def full_analysis(ticker: str, term: str = "short") -> str:
-    """Runs the complete forced checklist for one NSE stock: market regime, technical snapshot, fundamentals, institutional activity, upcoming results, and recent corporate announcements. term must be 'short' or 'long'."""
+    """Runs the complete forced checklist for one NSE stock: market regime, technical snapshot, fundamentals, institutional activity, upcoming results, and recent corporate announcements. term can be 'short', 'long', or 'breakout'."""
     return get_full_analysis(ticker, term)
 
 

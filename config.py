@@ -170,6 +170,56 @@ def round_trip_cost_pct(turnover_60d):
     return ROUND_TRIP_COST_PCT + IMPACT_COST_TIERS[-1][1]
 
 # ============================================
+# NEWS SAFETY-FILTER keyword set (Phase 2, UNVALIDATED - informational display only).
+# Answers "is this oversold name oversold for a REASON?" by matching NSE-filing text against
+# red-flag event types. NOT a buy/sell signal and NOT backtested yet - the filter direction
+# (do red-flagged oversold names underperform clean ones?) must clear backtest_news_events.py
+# before it may exclude anything. Single source of truth so tools.py and the backtest agree.
+# Guards mirror the ROUTINE_NOISE pattern in backtest_news_events.classify(): a category match
+# is dropped if a routine-paperwork word for that category is also present (e.g. a rating
+# "downgrade" hit is cancelled by "upgrade"/"reaffirm"; a governance "resignation" hit is
+# cancelled by a routine-role filing like "company secretary").
+# ============================================
+RED_FLAG_KEYWORDS = {
+    # NOTE: bare 'sebi' is deliberately absent - the phrase "SEBI (Listing Obligations...)
+    # Regulations, 2015" is boilerplate in most Reg-30 filings and false-flags everything. The
+    # enforcement-action words below catch a genuine SEBI order without the boilerplate noise.
+    "Regulatory / legal": ['show cause', 'show-cause', 'investigation', 'raid',
+                           'search and seizure', 'enforcement directorate', 'income tax',
+                           'gst demand', 'penalty', 'prosecution', 'fraud', 'litigation',
+                           'dispute', 'adjudicat', 'freezing of'],
+    "Governance exit":    ['resignation', 'resigns', 'cessation', 'removal of'],
+    "Distress / dilution": ['pledge', 'invocation', 'encumbr', 'insolvency', 'bankruptcy',
+                            'nclt', 'ibc', 'winding up', 'liquidation', 'one time settlement',
+                            'one-time settlement', 'debt restructur', 'default'],
+    "Rating downgrade":   ['downgrade', 'rating watch', 'negative outlook', 'revised rating'],
+    "Accounting concern": ['restatement', 'whistleblower', 'qualified opinion',
+                           'material misstatement', 'material weakness'],
+}
+RED_FLAG_GUARDS = {
+    "Governance exit":    ('company secretary', 'compliance officer', 'registrar',
+                           'debenture trustee', 're-appointment', 'reappointment'),
+    "Rating downgrade":   ('upgrade', 'reaffirm', 'assigned'),
+    "Distress / dilution": ('release of pledge', 'revocation of pledge', 'satisfaction of',
+                            'no default', 'nil default'),
+}
+
+
+def red_flags_in(text):
+    """Red-flag category names matched in a filing's text, after dropping routine-paperwork hits.
+    Substring match on lowercased text; a category is skipped if any of its guard words appear."""
+    blob = (text or '').lower()
+    hits = []
+    for cat, keys in RED_FLAG_KEYWORDS.items():
+        if not any(k in blob for k in keys):
+            continue
+        if any(g in blob for g in RED_FLAG_GUARDS.get(cat, ())):
+            continue
+        hits.append(cat)
+    return hits
+
+
+# ============================================
 # PROVIDER PRESETS
 # ============================================
 PROVIDERS = {
@@ -188,22 +238,39 @@ ACTIVE_PROVIDER = "google"
 # and mcp_server.py (Claude Desktop). Keep this in sync per CLAUDE.md.
 # ============================================
 SHARED_RULES = (
-    "You are a trading assistant for Indian NSE stocks supporting TWO distinct, independently "
-    "backtested strategies. Determine which one the user means: "
-    "\n\nSHORT-TERM (4-6 days, default if unspecified): RSI < 30 + ATR-based stops (z-score 8.08). "
-    "Use get_snapshot_text_short, scan_watchlist_text_short. "
+    "You are a trading assistant for Indian NSE stocks supporting distinct quantitative strategies. "
+    "Determine which one the user means: "
+    "\n\nVALIDATED SHORT-TERM (4-6 days, DEFAULT if unspecified): RSI < 30 + ATR-based stops (5-year validated, "
+    "day-clustered Small-cap z 2.74, overall z 8.08). Use get_snapshot_text_short, scan_watchlist_text_short. "
+    "Automatically excludes large-cap stocks, which showed no reliable edge. "
+    "\n\nEXPERIMENTAL BREAKOUT SWING (UNVALIDATED): Catalyst / Momentum Breakout (VCP / High Tight Base). "
+    "⚠️ EMPIRICAL BACKTEST REALITY (5-year panel, day-clustered vs random control): FAILED TO DEMONSTRATE EDGE. "
+    "Measured numbers: Small-cap z_paired=0.90 (-0.18% net), Mid-cap z_paired=0.20 (-0.76% net), Large-cap z_paired=0.48. "
+    "Confluence Score has zero predictive power (r=-0.009). "
+    "Use scan_watchlist_text_breakout, get_snapshot_text_breakout only when the user explicitly asks for breakout/momentum setups. "
+    "Always state plainly that this strategy is EXPERIMENTAL and NOT validated for positive edge after costs. "
     "\n\nLONG-TERM (~1 month): the VALIDATED signal is cross-sectional MOMENTUM. scan_watchlist_text_long "
     "ranks the liquid Mid/Small universe by 12-month momentum and returns the top-quartile BASKET (day-clustered "
-    "z ~9.5 out-of-sample, net ~+1.5%/trade). The old near-52w-high screen only survived in Small-cap (z 4.28). "
+    "z ~9.5 out-of-sample, net ~+1.5%/trade). "
     "ALWAYS present long-term as a diversified BASKET (several names, rebalanced ~monthly, sized small) and WARN "
     "that momentum crashes hard periodically - 2 of 5 backtested years were negative; high-return, high-drawdown. "
-    "Buy strength, not weakness - do NOT recommend oversold dips for this horizon. "
+    "Buy strength, not weakness. "
     "Use get_snapshot_text_long, scan_watchlist_text_long, and check get_fundamentals_text since "
     "fundamentals matter more here. "
-    "\n\nIf horizon is ambiguous, ASK the user rather than guessing. For calculate_position_size, "
-    "always pass the matching term ('short' or 'long'). Both share get_institutional_activity_text "
-    "and check_upcoming_results. Always mention stop loss and target clearly. Model signals are weak "
-    "in both cases. Never state with confidence what will happen. "
+    "\n\nIf horizon is ambiguous, default to the VALIDATED SHORT-TERM strategy (RSI < 30). "
+    "\n\nGENERAL ANALYSIS AND DISCUSSION: not every question is a trade request. You may answer "
+    "explanatory, comparative, educational, and open-ended questions directly - what an indicator "
+    "means, how a strategy works, what the numbers in a snapshot imply, how two stocks compare on "
+    "data you have pulled, what the current market regime suggests - without forcing the reply into "
+    "a buy/sell/verdict format and without running a full trade workup unless the user is actually "
+    "asking whether to trade. A clear, complete explanation is a finished answer on its own. This "
+    "does NOT relax any rule below: still never state a company fact, price, statistic, business "
+    "description, or news claim that did not come from a tool result in this conversation - if you "
+    "need such a fact to answer, call the tool first, and if no tool provides it, say so plainly "
+    "rather than guessing. Discuss freely, but only over verified data and general concepts, never "
+    "invented specifics. "
+    "For calculate_position_size, pass the matching term ('short', 'long', or 'breakout'). Both share get_institutional_activity_text "
+    "and check_upcoming_results. Always mention stop loss and target clearly. Model signals are weak. "
     "Whenever you identify a candidate stock to present as a recommendation, ALWAYS use get_full_analysis "
     "(not individual tools) to guarantee every check runs consistently every time. "
     "POSITION SIZING IS OPT-IN. Only call calculate_position_size when the user actually asks "

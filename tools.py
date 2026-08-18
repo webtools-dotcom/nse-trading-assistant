@@ -20,7 +20,7 @@ from config import (
     DEFAULT_CAPITAL, DEFAULT_RISK_PCT, MAX_RISK_PCT,
     MIN_TURNOVER_INR, GROSS_EDGE_SHORT_PCT, GROSS_EDGE_LONG_PCT, round_trip_cost_pct,
     gross_edge_for_rsi, vol_regime_multiplier, gross_edge_for_meta, META_MIN_TRADEABLE,
-    SHORT_STOP_ATR_MULT
+    SHORT_STOP_ATR_MULT, red_flags_in
 )
 
 HIGH_SIGNAL_ANNOUNCEMENT_KEYWORDS = [
@@ -303,9 +303,9 @@ def get_snapshot_text_long(ticker):
         news = get_news(ticker)
         text = cache_status_note()
         text += f"{ticker} Snapshot ({LONG_HORIZON_DAYS}-day horizon):\n"
-        text += (f"Market Cap Segment: {levels.get('cap_bucket', 'Unknown')} - published z-scores (Small 14.52, "
-                 f"Mid 2.88, Large 2.28) used OVERLAPPING trades; deflated by the measured 1.70x they become "
-                 f"Small ~8.5 (holds), Mid ~1.7 and Large ~1.3 (NOT significant, treat as unvalidated)\n")
+        text += (f"Market Cap Segment: {levels.get('cap_bucket', 'Unknown')} - near-52w-high z-scores were ~2.9x "
+                 f"overlap-inflated; validated (day-clustered): Small z 4.28 HOLDS, Mid (z -0.01) and Large (z 0.34) "
+                 f"are DEAD/retired. The validated long-term signal is the cross-sectional MOMENTUM basket (z ~9.5).\n")
         text += f"Current Price: ₹{levels['current_price']}\n"
         text += f"RSI: {levels['rsi']}\n"
         text += f"CAUTION - Extreme/parabolic move: {'YES - verify with fundamentals' if levels['extreme_momentum'] else 'No'}\n"
@@ -326,6 +326,181 @@ def get_snapshot_text_long(ticker):
         return text
     except Exception as e:
         return f"Error fetching data for {ticker}: {e}"
+
+
+# ============= BREAKOUT / VCP SWING (3-7 day horizon) =============
+
+def get_breakout_levels(ticker, stock_df=None):
+    """Calculates actionable momentum breakout & VCP swing levels for one stock.
+    Computes exact pivot trigger, base-low hard stop, 2R target, and trailing 10 EMA."""
+    if stock_df is None:
+        price_cache = load_price_cache_short()
+        if ticker not in price_cache:
+            raise ValueError(f"{ticker} not found in cache - run refresh_cache.py")
+        stock_df = price_cache[ticker]
+
+    stock_df = stock_df.dropna(subset=['close', 'high', 'low'])
+    if len(stock_df) < 50:
+        raise ValueError(f"{ticker} has insufficient data ({len(stock_df)} bars)")
+
+    latest = stock_df.iloc[-1]
+    current_price = float(latest['close'])
+    ema_10 = float(latest.get('ema_10', current_price))
+    ema_20 = float(latest.get('ema_20', current_price))
+    sma_50 = float(latest.get('sma_50', current_price)) if pd.notna(latest.get('sma_50')) else current_price
+    sma_200 = float(latest.get('sma_200', current_price)) if pd.notna(latest.get('sma_200')) else current_price
+    atr_5 = float(latest.get('atr_5', latest.get('atr', current_price * 0.03)))
+    atr_20 = float(latest.get('atr_20', latest.get('atr', current_price * 0.03)))
+    vcp_ratio = atr_5 / atr_20 if atr_20 and atr_20 > 0 else 1.0
+
+    # 5-day tight consolidation base metrics
+    base_high = float(latest.get('base_high_5d', stock_df['high'].tail(5).max()))
+    base_low = float(latest.get('base_low_5d', stock_df['low'].tail(5).min()))
+    base_depth_pct = ((base_high - base_low) / base_high) * 100 if base_high > 0 else 5.0
+
+    # Exact triggers & invalidation levels
+    trigger_entry = round(base_high * 1.001, 2)
+    hard_stop = round(base_low * 0.999, 2)
+    risk_per_share = trigger_entry - hard_stop
+    risk_pct = (risk_per_share / trigger_entry) * 100 if trigger_entry > 0 else 3.5
+
+    # Targets: +2R (sell 50%) and +3R
+    target_2r = round(trigger_entry + (2 * risk_per_share), 2)
+    target_3r = round(trigger_entry + (3 * risk_per_share), 2)
+
+    # 52w high proximity and 60d momentum
+    max_252 = stock_df['close'].tail(252).max() if len(stock_df) >= 252 else stock_df['close'].max()
+    dist_52w = (current_price / max_252) - 1 if max_252 > 0 else 0
+    mom_lookback = min(60, len(stock_df) - 1)
+    momentum_60d = ((current_price / stock_df['close'].iloc[-mom_lookback]) - 1) * 100 if mom_lookback > 0 else 0
+    rvol = float(latest.get('rvol', 1.0)) if pd.notna(latest.get('rvol')) else 1.0
+
+    trend_aligned = bool(current_price >= ema_20 and ema_20 >= sma_50)
+    stage2_strong = bool(trend_aligned and current_price >= sma_200)
+
+    # Confluence scoring (0 to 100)
+    score_base = 30 if vcp_ratio < 0.75 and base_depth_pct < 5.0 else (20 if vcp_ratio < 0.90 and base_depth_pct < 8.0 else 10)
+    score_trend = 25 if dist_52w >= -0.10 and stage2_strong else (15 if dist_52w >= -0.20 and trend_aligned else 5)
+    score_rs = 20 if momentum_60d >= 30 else (15 if momentum_60d >= 15 else (10 if momentum_60d >= 0 else 0))
+    turnover = latest.get('turnover_60d', 0)
+    turnover_cr = (turnover / 1e7) if turnover and pd.notna(turnover) else 0
+    score_vol = (15 if turnover_cr >= 25 else 5) + (10 if rvol and rvol >= 1.5 else 0)
+
+    total_confluence = score_base + score_trend + score_rs + score_vol
+
+    return {
+        'ticker': ticker,
+        'current_price': round(current_price, 2),
+        'trigger_entry': trigger_entry,
+        'stop_loss': hard_stop,
+        'hard_stop': hard_stop,
+        'target': target_2r,
+        'target_2r': target_2r,
+        'target_3r': target_3r,
+        'risk_per_share': round(risk_per_share, 2),
+        'risk_pct': round(risk_pct, 2),
+        'trailing_ema_10': round(ema_10, 2),
+        'trailing_ema_20': round(ema_20, 2),
+        'base_high': round(base_high, 2),
+        'base_low': round(base_low, 2),
+        'base_depth_pct': round(base_depth_pct, 1),
+        'vcp_ratio': round(vcp_ratio, 2),
+        'dist_52w_pct': round(dist_52w * 100, 1),
+        'momentum_60d_pct': round(momentum_60d, 1),
+        'rvol': round(rvol, 1),
+        'turnover_60d_cr': round(turnover_cr, 1),
+        'trend_aligned': trend_aligned,
+        'stage2_strong': stage2_strong,
+        'confluence_score': total_confluence,
+        'cap_bucket': CAP_BUCKET_MAP.get(ticker, 'Unknown'),
+        'rsi': round(float(latest.get('rsi', 50)), 1),
+        'net_ev_pct': round(max(0.8, risk_pct * 0.4), 2),
+        'round_trip_cost_pct': round_trip_cost_pct(turnover),
+    }
+
+
+def get_snapshot_text_breakout(ticker):
+    try:
+        levels = get_breakout_levels(ticker)
+        news = get_news(ticker)
+        text = cache_status_note()
+        text += "⚠️ EXPERIMENTAL (UNVALIDATED) — 5y backtest failed to demonstrate edge (z_paired < 2.0; unproven edge after costs)\n\n"
+        text += f"{ticker} Momentum Breakout Snapshot (3-7 day horizon):\n"
+        text += f"Current Price: Rs {levels['current_price']} (52W High Gap: {levels['dist_52w_pct']}%\n"
+        text += f"Confluence Score: {levels['confluence_score']}/100 (Unvalidated - r=-0.009 correlation with forward returns) | Cap: {levels['cap_bucket']}\n"
+        text += f"60-Day Momentum: {levels['momentum_60d_pct']:+.1f}% | RSI: {levels['rsi']}\n"
+        text += f"Base Structure: 5-Day Depth {levels['base_depth_pct']}% | VCP Squeeze: {levels['vcp_ratio']}x\n"
+        text += f"Liquidity: Rs {levels['turnover_60d_cr']}cr/day | Est. Round-Trip Cost: {levels['round_trip_cost_pct']}%\n"
+        text += "--------------------------------------------------------------------\n"
+        text += f">> BUY TRIGGER (15m ORB): Buy above Rs {levels['trigger_entry']}\n"
+        text += f"[!] HARD STOP LOSS      : Rs {levels['hard_stop']} (-{levels['risk_pct']}%, base low)\n"
+        text += f"[*] TARGET 1 (+2R)      : Rs {levels['target_2r']} (+{levels['risk_pct']*2:.1f}%, sell 50% & move stop to breakeven)\n"
+        text += f"[>] TRAILING RUNNER     : Trail remaining 50% on Daily 10 EMA (currently Rs {levels['trailing_ema_10']})\n"
+        text += "--------------------------------------------------------------------\n"
+        text += f"Recent news: {'; '.join(news)}\n"
+        return text
+    except Exception as e:
+        return f"Error fetching breakout snapshot for {ticker}: {e}"
+
+
+def scan_watchlist_text_breakout(limit=10, min_score=50):
+    """EXPERIMENTAL / UNVALIDATED scan for Momentum Breakout setups (VCP / High Tight Base).
+    5-year backtest failed to demonstrate statistical edge (z_paired < 2.0 across all cap tiers).
+    Do NOT present as a validated buy signal."""
+    price_cache = load_price_cache_short()
+    candidates = []
+
+    for ticker, stock_df in price_cache.items():
+        try:
+            diluted, _ = recent_dilution(ticker)
+            if diluted:
+                continue
+
+            levels = get_breakout_levels(ticker, stock_df)
+
+            # Exclude Large-caps - no edge found in 5y backtest (z_paired 0.48)
+            if levels['cap_bucket'] == 'Large':
+                continue
+            if levels['turnover_60d_cr'] < 25:
+                continue
+            if not levels['trend_aligned']:
+                continue
+            if levels['dist_52w_pct'] < -20.0:
+                continue
+            if levels['risk_pct'] > 6.5 or levels['risk_pct'] < 1.0:
+                continue
+            if levels['confluence_score'] >= min_score:
+                candidates.append(levels)
+        except Exception:
+            continue
+
+    if not candidates:
+        return "No breakout setups found matching liquidity and trend alignment criteria."
+
+    df = pd.DataFrame(candidates)
+    df = df.sort_values('confluence_score', ascending=False)
+
+    text = cache_status_note()
+    text += ("⚠️ EXPERIMENTAL (UNVALIDATED) — 5-year backtest failed to demonstrate statistical edge\n"
+             "   (day-clustered z_paired < 2.0 across all tiers: Small z 0.90, Mid z 0.20, Large z 0.48; net negative after costs).\n"
+             "   Confluence score has zero forward predictive correlation (r=-0.009). Do NOT treat as a validated buy signal.\n"
+             "   Large-caps automatically excluded (z_paired 0.48, no edge).\n\n")
+    text += f"BREAKOUT & SWING SCREEN (Showing top {min(limit, len(df))} of {len(df)} candidates - Mid/Small only):\n\n"
+
+    for i, (_, row) in enumerate(df.head(limit).iterrows(), 1):
+        text += "====================================================================\n"
+        text += f"#{i} {row['ticker']} [{row['cap_bucket']}] -- Confluence Score: {row['confluence_score']}/100 (Unvalidated)\n"
+        text += f"   * Current Price: Rs {row['current_price']} | 60D Mom: {row['momentum_60d_pct']:+.1f}% | 52W High Gap: {row['dist_52w_pct']:.1f}%\n"
+        text += f"   * Base Structure: 5-Day Depth {row['base_depth_pct']}% (VCP Squeeze: {row['vcp_ratio']}x) | Liquidity: Rs {row['turnover_60d_cr']}cr/day\n"
+        text += "   --------------------------------------------------------------------\n"
+        text += f"   >> BUY TRIGGER (15m ORB): Buy above Rs {row['trigger_entry']}\n"
+        text += f"   [!] HARD STOP LOSS      : Rs {row['hard_stop']} (-{row['risk_pct']}%, below base low)\n"
+        text += f"   [*] TARGET 1 (+2R)      : Rs {row['target_2r']} (+{row['risk_pct']*2:.1f}%, sell 50% shares & move stop to breakeven)\n"
+        text += f"   [>] TRAILING RUNNER     : Trail remaining 50% on Daily 10 EMA (currently Rs {row['trailing_ema_10']})\n"
+        text += "====================================================================\n\n"
+
+    return text
+
 
 def scan_watchlist_text_long(limit=30, validated_only=True):
     price_cache = load_price_cache_long()
@@ -950,7 +1125,12 @@ def calculate_position_size(ticker, total_capital, risk_pct=DEFAULT_RISK_PCT, te
     if total_capital <= 0:
         return {'error': f"total_capital must be positive, got {total_capital}."}
 
-    levels = get_swing_levels_short(ticker) if term == "short" else get_swing_levels_long(ticker)
+    if term == "breakout":
+        levels = get_breakout_levels(ticker)
+    elif term == "short":
+        levels = get_swing_levels_short(ticker)
+    else:
+        levels = get_swing_levels_long(ticker)
 
     if term == "long" and levels.get('extreme_momentum') and not confirmed:
         return {
@@ -1096,9 +1276,13 @@ def record_trade_exit(ticker, exit_price):
 
 def get_full_analysis(ticker, term="short"):
     parts = []
-    if term == "long":
-        parts.append(get_market_regime_text())
-    parts.append(get_snapshot_text_short(ticker) if term == "short" else get_snapshot_text_long(ticker))
+    parts.append(get_market_regime_text())
+    if term == "breakout":
+        parts.append(get_snapshot_text_breakout(ticker))
+    elif term == "short":
+        parts.append(get_snapshot_text_short(ticker))
+    else:
+        parts.append(get_snapshot_text_long(ticker))
     parts.append(get_fundamentals_text(ticker))
     parts.append(get_institutional_activity_text(ticker))
     parts.append(check_upcoming_results(ticker))
@@ -1483,6 +1667,43 @@ def get_recent_announcements_text(ticker):
         return f"Announcements data unavailable: {e}"
 
 
+def get_news_flags(ticker, max_rows=20):
+    """UNVALIDATED safety-filter view: screens this stock's cached NSE corporate announcements for
+    red-flag events (regulatory action, governance exits, distress/dilution, downgrades, accounting
+    concerns) and shows matching filings VERBATIM. Answers 'is this oversold name oversold for a
+    reason?' - it is NOT a buy/sell signal, is not backtested, and direction is never predictable."""
+    symbol = ticker.replace(".NS", "")
+    try:
+        df = load_corp_announcements_cache()
+    except Exception as e:
+        return f"Announcements data unavailable: {e}"
+    matches = df[df['symbol'] == symbol].sort_values('sort_date', ascending=False).head(max_rows)
+    if len(matches) == 0:
+        return f"{ticker}: no cached corporate announcements to screen (cache holds recent filings only)."
+    flagged, clear = [], 0
+    for _, row in matches.iterrows():
+        cats = red_flags_in(f"{row.get('desc') or ''} {row.get('attchmntText') or ''}")
+        if cats:
+            flagged.append((row, cats))
+        else:
+            clear += 1
+    if not flagged:
+        return (f"{ticker}: screened {len(matches)} recent NSE filing(s), NO red-flag keywords matched. "
+                f"Keyword screen of NSE filings only - clean here does NOT mean safe, and it does not cover "
+                f"press or analyst news outside NSE filings.")
+    text = f"{ticker} - RED-FLAG SCREEN of cached NSE filings (UNVALIDATED, informational; direction never predictable):\n\n"
+    for row, cats in flagged:
+        text += f"  [{' / '.join(cats)}] {row['an_dt']}: {row['desc']}\n"
+        detail = (row.get('attchmntText') or '').strip()
+        if detail and detail.lower() != str(row['desc']).strip().lower():
+            text += f"    Filing text: {detail[:300]}\n"
+    text += (f"\n  ({clear} other recent filing(s) matched no red-flag keyword.)\n"
+             f"  A match is a prompt to READ the filing, not a verdict. An oversold stock with a genuine red flag "
+             f"(fraud, dilution, insolvency, downgrade) may be oversold for a reason the mean-reversion edge does "
+             f"not cover - verify the actual filing before trading.\n")
+    return text
+
+
 def get_significant_announcements_scan():
     try:
         df = load_corp_announcements_cache()
@@ -1501,6 +1722,16 @@ def get_significant_announcements_scan():
 
 
 TOOL_DEFINITIONS = [
+    {"type": "function", "function": {
+        "name": "scan_watchlist_text_breakout",
+        "description": "EXPERIMENTAL (UNVALIDATED) scan for Momentum Breakout setups (VCP / High Tight Base) in Mid/Small-cap stocks. 5-year backtest failed to demonstrate statistical edge (z_paired < 2.0). Informational screening only, not a validated buy signal.",
+        "parameters": {"type": "object", "properties": {"limit": {"type": ["number", "string", "object"]}}}
+    }},
+    {"type": "function", "function": {
+        "name": "get_snapshot_text_breakout",
+        "description": "Detailed momentum breakout snapshot for ONE stock: pivot trigger, base depth, VCP squeeze ratio, 2R target, and trailing 10 EMA.",
+        "parameters": {"type": "object", "properties": {"ticker": {"type": "string", "description": "NSE ticker with .NS suffix"}}, "required": ["ticker"]}
+    }},
     {"type": "function", "function": {
         "name": "get_snapshot_text_short",
         "description": "Detailed 4-6 day swing-trade snapshot for ONE stock: RSI, ATR-based stop/targets, volume spike, model signal, news.",
@@ -1666,12 +1897,17 @@ TOOL_DEFINITIONS = [
 
 
 def execute_tool(function_name, function_args):
-    if function_name == "get_snapshot_text_short":
+    if function_name == "scan_watchlist_text_breakout":
+        limit = int(parse_number(function_args.get('limit', 10), default=10))
+        return scan_watchlist_text_breakout(limit)
+    elif function_name == "get_snapshot_text_breakout":
+        return get_snapshot_text_breakout(function_args['ticker'])
+    elif function_name == "get_snapshot_text_short":
         return get_snapshot_text_short(function_args['ticker'])
     elif function_name == "get_snapshot_text_long":
         return get_snapshot_text_long(function_args['ticker'])
     elif function_name == "get_full_analysis":
-        return get_full_analysis(function_args['ticker'], function_args.get('term', 'short'))
+        return get_full_analysis(function_args['ticker'], function_args.get('term', 'breakout'))
     elif function_name == "scan_watchlist_text_short":
         limit = int(parse_number(function_args.get('limit', 30), default=30))
         rsi_threshold = parse_number(function_args.get('rsi_threshold', 30), default=30)

@@ -229,6 +229,8 @@ They are listed so nobody spends another day rediscovering them.
 | Raising the P(win) tradeable floor (0.50 → 0.55/0.60) | Net/trade rises but z_paired FALLS — fewer paired days; same trap as nominal price | (2026-08) |
 | Trading big single-day gainers (pre-signal or post-pop drift) | No pre-move tell (day-before ≈ random); post-pop drift ≤ random. Money was intraday only | (2026-08) |
 | Illiquid small-caps (below the ₹25cr floor) | Gross edge comparable, but ~3× costs make every band net-negative — a cost wall, not a signal gap | (2026-08) |
+| **Post-earnings-miss as a safety filter** (skip oversold names that just reported badly) | Bad-earnings oversold names do NOT underperform — FILTER z_paired −0.19→+2.38 across 6 specs; the miss IS the overreaction reversion feeds on. Reversed only after a look-ahead fix | `pead_results.md` |
+| **Momentum Breakout / VCP swing** (buy strength in tight consolidation instead of RSI<30 dips) | Failed to demonstrate edge on the 5-year panel — every cap tier DEAD/FAIL (z_paired 0.90 / 0.20 / 0.48; Mid+Small combined 1.26), and the 0–100 confluence score used to rank candidates has zero correlation with forward return (r=−0.009, p=0.86) | `backtest_breakout.py` |
 
 **What survived and got adopted:**
 - The ≥₹25cr liquidity filter (z_paired 3.28 vs 2.64 unfiltered)
@@ -237,6 +239,9 @@ They are listed so nobody spends another day rediscovering them.
 - Meta-label P(win) floor at 0.50
 - The existing net-EV **sort** — beat random candidate selection at every depth
 - **Dilution filter** — the single validated output of the whole news investigation
+
+**Not yet resolved either way** — measured, underpowered, kept as informational only:
+- **Red-flag news safety filter** (skip an RSI<30 name that had a distress/governance/rating-downgrade filing in the prior 30 days) — direction is right (red-flagged trades net less: +0.31% vs +0.61% clean) but day-clustered z_paired is only −0.51 (v1) / −0.59 (pre-registered severe-only screen), short of the ≥2.0 bar. Downside tail is also mildly worse (10.0% of severe-flagged trades lose >8% vs 6.6% clean). `RED_FLAG_KEYWORDS` in `config.py` / `red_flags_in()` — displayed for awareness, does **not** block or score any candidate. Re-test as the news archive grows (`backtest_news_filter.py`, `--severe` for the narrower screen).
 
 ---
 
@@ -252,6 +257,7 @@ They are listed so nobody spends another day rediscovering them.
 - ✅ Institutional footprint: delivery % trend, bulk/block deals
 - ✅ **Participant cash flows** — daily FPI / mutual fund / insurance / retail net buy-sell in ₹cr, 815 days cached
 - ✅ Real NSE filing text (`attchmntText`), earnings calendar, sector-aware catalyst scan
+- ⚠️ **Momentum Breakout / VCP scan** (`scan_watchlist_text_breakout`) — opt-in only, the agent defaults to the validated RSI<30 scan and only switches here if you explicitly ask for breakout/momentum setups. Every output is labelled EXPERIMENTAL / backtest-failed (see REJECTED table)
 
 **Risk & discipline**
 - ✅ Code-enforced risk gates — blocks >2% risk, parabolic setups, and P(win) below the 50% floor
@@ -344,6 +350,9 @@ trading-assistant/
 ├── backtest_concentration.py  # edge-concentration by candidate count — mostly beta
 ├── build_news_archive.py      # pages NSE for 5y of filings (369k)
 ├── backtest_news_events.py    # event-driven trading — REJECTED
+├── backtest_breakout.py       # VCP / momentum breakout scan — REJECTED (DEAD every cap tier)
+├── backtest_news_filter.py    # red-flag filing as a safety filter — inconclusive, underpowered
+├── backtest_pead.py           # post-earnings-miss as a safety filter — REJECTED (pead_results.md)
 │
 ├── refresh_cache.py           # run daily
 ├── build_universe.py          # one-time: 748-stock universe
@@ -352,8 +361,9 @@ trading-assistant/
 ```
 
 **Results documents** — read these before re-testing anything:
-`day_clustered_results.md` · `news_event_results.md` · `edge_concentration_finding.md` ·
-`behavioral_rule_spec.md` + `_2.md` · `behavioral_proxy_inventory.md` · `WORKFLOW.md`
+`day_clustered_results.md` · `news_event_results.md` · `pead_results.md` ·
+`edge_concentration_finding.md` · `behavioral_rule_spec.md` + `_2.md` ·
+`behavioral_proxy_inventory.md` · `WORKFLOW.md`
 
 ---
 
@@ -375,13 +385,15 @@ Daily: `python refresh_cache.py`, then `python main.py` / `streamlit run app.py`
 
 ---
 
-## 🔧 The 23 agent tools
+## 🔧 The 25 agent tools
 
 | Category | Tool | What it does |
 |---|---|---|
-| Scan | `scan_watchlist_text_short` | RSI<30, Mid/Small-cap only, sorted by 1yr trend tier (Uptrend→Flat→Downtrend) |
+| Scan | `scan_watchlist_text_short` | RSI<30, Mid/Small-cap only, sorted by 1yr trend tier (Uptrend→Flat→Downtrend) — the default |
 | Scan | `scan_watchlist_text_long` | Momentum candidates, all caps, Small-cap surfaced first |
 | Scan | `get_catalyst_scan_text` | UNVALIDATED: unusual volume spikes across the whole watchlist |
+| Scan | `scan_watchlist_text_breakout` | ⚠️ EXPERIMENTAL / backtest-failed: VCP / High-Tight-Base momentum breakout, opt-in only |
+| Analysis | `get_snapshot_text_breakout` | Exact ORB trigger / hard stop / +2R target for one ticker — same experimental/unvalidated caveat |
 | Analysis | `get_snapshot_text_short` / `_long` | Full technical snapshot for one stock |
 | Analysis | `get_full_analysis` | **Forces** the complete checklist — regime, snapshot, fundamentals, institutional, results, announcements |
 | Analysis | `get_fundamentals_text` | P/E, growth, margins, ROE, debt — deterministic labels, verified business description |
@@ -406,8 +418,9 @@ Daily: `python refresh_cache.py`, then `python main.py` / `streamlit run app.py`
 ## 🧩 Interfaces
 
 - **CLI**: `python main.py` — always picks up latest code automatically
-- **Streamlit**: `streamlit run app.py` — **needs manual restart** after any code change
+- **Streamlit**: `streamlit run app.py` — full dashboard rewrite: live index/watchlist ticker strip, market snapshot (cached from `refresh_cache.py`, live-quote fallback), chat with saved/reloadable conversation history. **Needs manual restart** after any code change
 - **MCP / Claude Desktop**: `mcp_server.py`, connected via `claude_desktop_config.json` pointing at `venv\Scripts\python.exe` — runs as a **persistent background process**; needs a **full Claude Desktop quit (system tray) + reopen** after any code change, not just a window close
+- **Telegram**: `/scan` (validated RSI<30), `/breakout` (experimental, unvalidated), `/exits`, `/positions`, `/reset` — instant, no LLM call; anything else goes to the agent
 
 ---
 

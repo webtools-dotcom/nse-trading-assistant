@@ -26,7 +26,7 @@ import requests
 
 from agent import TradingAgent
 from notify import API, ALLOWED, TG_LIMIT, TOKEN, _post, send
-from tools import get_exit_check_text, get_open_positions, scan_watchlist_text_short
+from tools import get_exit_check_text, get_open_positions, scan_watchlist_text_breakout, scan_watchlist_text_short
 
 POLL_TIMEOUT = 30
 
@@ -35,9 +35,10 @@ HELP = (
     "Just type normally - 'thoughts on IRFC at 130?', 'scan for setups', "
     "'size 1% risk on BBOX with 2 lakh'.\n\n"
     "Shortcuts (no AI call, instant):\n"
+    "  /scan      - validated short-term scan (RSI < 30)\n"
+    "  /breakout  - experimental momentum breakout screen\n"
     "  /exits     - check open positions against stop/target/time\n"
     "  /positions - list open positions\n"
-    "  /scan      - raw short-term scan\n"
     "  /reset     - clear conversation memory\n"
 )
 
@@ -57,6 +58,8 @@ def handle(agent, chat_id, text):
         return get_open_positions()
     if cmd == "/scan":
         return scan_watchlist_text_short(limit=10)
+    if cmd == "/breakout":
+        return scan_watchlist_text_breakout(limit=5)
     return agent.ask(text)
 
 

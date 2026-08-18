@@ -340,7 +340,12 @@ def check_exit_signals():
             results.append({'ticker': ticker, 'term': term, 'error': f"Unparseable entry_date: {row['entry_date']!r}"})
             continue
         days_held = int(np.busday_count(entry_date.date(), datetime.now().date()))
-        horizon = SHORT_HORIZON_DAYS if term == 'short' else LONG_HORIZON_DAYS
+        if term == 'breakout':
+            horizon = 7
+        elif term == 'short':
+            horizon = SHORT_HORIZON_DAYS
+        else:
+            horizon = LONG_HORIZON_DAYS
 
         results.append({
             'ticker': ticker, 'term': term, 'days_held': days_held, 'horizon': horizon,

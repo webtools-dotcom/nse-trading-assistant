@@ -1,7 +1,7 @@
 import pandas as pd
 import yfinance as yf
 from nselib import capital_market
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import ta
 import pickle
 import os
@@ -28,8 +28,13 @@ MARKET_BREADTH_CACHE_FILE = os.path.join(CACHE_DIR, "market_breadth.pkl")
 CORP_ANNOUNCEMENTS_CACHE_FILE = os.path.join(CACHE_DIR, "corp_announcements.pkl")
 VIX_CACHE_FILE = os.path.join(CACHE_DIR, "vix_data.pkl")
 CATEGORY_FLOWS_FILE = os.path.join(CACHE_DIR, "category_flows.pkl")
+UI_QUOTES_CACHE_FILE = os.path.join(CACHE_DIR, "ui_quotes.pkl")
 
 os.makedirs(CACHE_DIR, exist_ok=True)
+
+IST = timezone(timedelta(hours=5, minutes=30))
+UI_QUOTES_SYMBOLS = ["^NSEI", "^BSESN", "RELIANCE.NS", "HDFCBANK.NS", "TCS.NS", "INFY.NS",
+                      "ICICIBANK.NS", "BHARTIARTL.NS", "SBIN.NS", "ITC.NS"]
 
 
 def _load_pickle(path, what):
@@ -481,6 +486,42 @@ def refresh_vix_cache():
 
 def load_vix_cache():
     return _load_pickle(VIX_CACHE_FILE, "VIX")
+
+def refresh_market_ui_cache():
+    """Snapshots index/watchlist quotes + the top Nifty headline for the Streamlit UI's ticker
+    strip, so `streamlit run app.py` loads instantly instead of hitting yfinance live on every
+    start. Keyed by IST calendar date - app.py falls back to a live fetch once this goes stale."""
+    print("Downloading market UI snapshot...")
+    quotes = {}
+    for symbol in UI_QUOTES_SYMBOLS:
+        try:
+            info = yf.Ticker(symbol).fast_info
+            last, prev = info["last_price"], info["previous_close"]
+            quotes[symbol] = {"price": last, "chg_pct": (last - prev) / prev * 100}
+        except Exception:
+            continue
+    headline = None
+    try:
+        news = yf.Ticker("^NSEI").news
+        if news:
+            headline = news[0].get("title") or news[0].get("content", {}).get("title")
+    except Exception:
+        pass
+    data = {"date": datetime.now(IST).strftime("%Y-%m-%d"), "quotes": quotes, "headline": headline}
+    with open(UI_QUOTES_CACHE_FILE, 'wb') as f:
+        pickle.dump(data, f)
+    print(f"Market UI cache saved ({len(quotes)}/{len(UI_QUOTES_SYMBOLS)} symbols)")
+    return data
+
+def load_market_ui_cache():
+    """Today's UI snapshot, or None if missing/from a previous day (app.py falls back to a live fetch)."""
+    if not os.path.exists(UI_QUOTES_CACHE_FILE):
+        return None
+    with open(UI_QUOTES_CACHE_FILE, 'rb') as f:
+        data = pickle.load(f)
+    if data.get("date") != datetime.now(IST).strftime("%Y-%m-%d"):
+        return None
+    return data
 
 def refresh_corp_announcements_cache(tickers, days_back=8):  # must exceed DILUTION_LOOKBACK_DAYS (7)
     """Caches recent corporate announcements filtered to the watchlist - whole-market volume is too large to cache in full."""
