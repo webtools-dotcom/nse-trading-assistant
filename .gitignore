@@ -8,3 +8,6 @@ trade_log.csv
 graphify.env
 graphify-out/
 .claude/settings.local.json
+
+# news feed daily cache (runtime artifact)
+news_feed_cache.json

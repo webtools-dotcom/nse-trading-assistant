@@ -334,7 +334,9 @@ trading-assistant/
 ├── decay_monitor.py           # CUSUM alarm on live edge decay
 ├── tools.py                   # 23 agent tools, checklist, risk gates, dilution filter
 ├── agent.py                   # provider-agnostic tool loop
-├── main.py / app.py           # CLI / Streamlit
+├── main.py                     # CLI
+├── Home.py / pages/            # Streamlit multipage: news home + Assistant tab
+├── news_feed.py                # isolated home-page news feed (RSS + LLM rank, display-only)
 ├── mcp_server.py              # MCP server (Claude Desktop)
 │
 ├── notify.py                  # Telegram delivery (dependency-light, no pandas)
@@ -381,7 +383,7 @@ pip install -r requirements.txt
 
 First-time: `python build_universe.py` → `python model_trainer_short.py` → `python model_trainer_long.py` → `python refresh_cache.py`
 
-Daily: `python refresh_cache.py`, then `python main.py` / `streamlit run app.py` / Claude Desktop (see MCP setup below)
+Daily: `python refresh_cache.py`, then `python main.py` / `streamlit run Home.py` / Claude Desktop (see MCP setup below)
 
 ---
 
@@ -418,7 +420,7 @@ Daily: `python refresh_cache.py`, then `python main.py` / `streamlit run app.py`
 ## 🧩 Interfaces
 
 - **CLI**: `python main.py` — always picks up latest code automatically
-- **Streamlit**: `streamlit run app.py` — full dashboard rewrite: live index/watchlist ticker strip, market snapshot (cached from `refresh_cache.py`, live-quote fallback), chat with saved/reloadable conversation history. **Needs manual restart** after any code change
+- **Streamlit**: `streamlit run Home.py` — multipage. **Home** = today's market news ranked biggest→normal by an isolated news LLM (`news_feed.py`, own `*_NEWS_API` keys, display-only, not backtested) + market snapshot. **Assistant tab** (`pages/1_📈_Assistant.py`) = the trading tool, moved unchanged: live ticker strip, snapshot, chat with saved conversation history. **Needs manual restart** after any code change
 - **MCP / Claude Desktop**: `mcp_server.py`, connected via `claude_desktop_config.json` pointing at `venv\Scripts\python.exe` — runs as a **persistent background process**; needs a **full Claude Desktop quit (system tray) + reopen** after any code change, not just a window close
 - **Telegram**: `/scan` (validated RSI<30), `/breakout` (experimental, unvalidated), `/exits`, `/positions`, `/reset` — instant, no LLM call; anything else goes to the agent
 

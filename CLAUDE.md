@@ -47,7 +47,7 @@ say "this clearly works", that is the exact moment the project has historically 
 ```bash
 python refresh_cache.py          # daily; several minutes, downloads 748 stocks
 python main.py                   # CLI — always picks up latest code
-streamlit run app.py             # needs manual restart after code changes
+streamlit run Home.py            # news home + Assistant tab; manual restart after code changes
 python news_watcher.py --once --dry --force   # phone watcher, sends nothing
 ```
 
@@ -63,7 +63,7 @@ On Windows use `PYTHONIOENCODING=utf-8` or ₹ symbols crash the console.
 ## Three interfaces, three restart behaviours
 
 - `main.py` (CLI) — re-reads everything each run. **Test fixes here first, it is the fastest signal.**
-- `app.py` (Streamlit) — must be manually stopped and restarted after any code change.
+- `Home.py` (Streamlit entrypoint) — multipage: news home + `pages/1_📈_Assistant.py` (the trading tool, moved unchanged). The news feed (`news_feed.py`, isolated `NEWS_PROVIDERS` in config) is display-only and touches no backtested path. Must be manually stopped and restarted after any code change.
 - `mcp_server.py` (Claude Desktop) — persistent background process. Needs a full **system-tray
   quit**, not a window close. Editing `tools.py` has zero effect until then.
 

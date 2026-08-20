@@ -175,6 +175,44 @@ def get_open_positions():
     return text
 
 
+def realized_pnl_summary():
+    """All-time REALIZED P&L across closed trades (read-only, for the dashboard). Absolute ₹ is
+    (exit-entry)*shares per closed row - partial sells already sit as their own closed rows, so
+    summing is correct. Returns zeros when nothing is closed yet."""
+    df = _load_log()
+    closed = df[df['status'].astype(str).str.lower() != 'open'].copy()
+    for c in ('entry_price', 'exit_price', 'shares', 'return_pct'):
+        closed[c] = pd.to_numeric(closed[c], errors='coerce')
+    closed = closed.dropna(subset=['entry_price', 'exit_price', 'shares'])
+    n = len(closed)
+    if n == 0:
+        return {'realized_inr': 0.0, 'n_closed': 0, 'wins': 0, 'win_rate': None,
+                'best_pct': None, 'worst_pct': None}
+    pnl = ((closed['exit_price'] - closed['entry_price']) * closed['shares']).sum()
+    rp = closed['return_pct'].dropna()
+    wins = int((rp > 0).sum())
+    return {'realized_inr': float(pnl), 'n_closed': n, 'wins': wins,
+            'win_rate': (wins / len(rp) * 100) if len(rp) else None,
+            'best_pct': float(rp.max()) if len(rp) else None,
+            'worst_pct': float(rp.min()) if len(rp) else None}
+
+
+def open_positions_records():
+    """Open positions as plain dicts for the dashboard (read-only). Numeric fields coerced;
+    None where missing. The text view get_open_positions() stays the agent-facing one."""
+    df = _load_log()
+    open_df = df[df['status'] == 'open']
+    out = []
+    for _, r in open_df.iterrows():
+        rec = {'ticker': r['ticker'], 'term': r['term'], 'entry_date': r['entry_date']}
+        for f in ('entry_price', 'stop_loss', 'target', 'shares'):
+            rec[f] = pd.to_numeric(r[f], errors='coerce')
+            if pd.isna(rec[f]):
+                rec[f] = None
+        out.append(rec)
+    return out
+
+
 def discipline_check(ticker, risk_pct=None):
     """Behavioural guardrails read off the user's OWN trade log.
 
@@ -272,8 +310,8 @@ def get_similar_past_trades(term, validated_setup=None):
     else:
         confidence_note = f"{count} past trades match this profile - a reasonably sized personal sample."
 
-    text = f"Your past trades matching this profile (term={term}"
-    text += f", validated_setup={validated_setup}" if validated_setup is not None else ""
+    text = f"Your overall {term}-term track record (NOT specific to this stock"
+    text += f", filtered to validated_setup={validated_setup}" if validated_setup is not None else ""
     text += f"):\n\nCount: {count}\nWin rate: {win_rate:.1f}%\nAverage return: {avg_return:.2f}%\n\n{confidence_note}\n\n"
     text += "Individual trades:\n"
     for _, row in closed.sort_values('entry_date').iterrows():

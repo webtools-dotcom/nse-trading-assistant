@@ -7,6 +7,7 @@ from datetime import datetime, timezone, timedelta
 import yfinance as yf
 from agent import TradingAgent
 from cache_manager import load_market_ui_cache
+from ui_common import inject_theme, render_nav
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -145,6 +146,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+inject_theme()
+render_nav("assistant")
 
 # Design System: TradingView Pro & Bloomberg Terminal Standard (Pure Charcoal + Bloomberg Amber)
 st.markdown("""
@@ -680,6 +683,26 @@ div[data-testid="stChatInput"] button {
 </style>
 """, unsafe_allow_html=True)
 
+# Ctrl+B toggles the sidebar by clicking Streamlit's own collapse/expand control. One guarded
+# listener on the parent doc, in a 0-height iframe.
+st.components.v1.html("""
+<script>
+const doc = window.parent.document;
+if (!doc.__sidebarShortcut) {
+  doc.__sidebarShortcut = true;
+  doc.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
+      e.preventDefault();
+      const openBtn = doc.querySelector('[data-testid="stSidebarCollapsedControl"] button, [data-testid="collapsedControl"] button, [data-testid="collapsedControl"]');
+      const closeBtn = doc.querySelector('[data-testid="stSidebarCollapseButton"] button, [data-testid="stSidebarCollapseButton"]');
+      const btn = openBtn || closeBtn;
+      if (btn) btn.click();
+    }
+  });
+}
+</script>
+""", height=0)
+
 # Render Header
 st.markdown("""
 <div class="terminal-header">
@@ -877,7 +900,16 @@ if len(st.session_state.messages) == 0:
             action_prompt = "Check my trading discipline, risk limits, and journal metrics"
 
 prompt = st.chat_input("Enter command, stock ticker (e.g. RELIANCE), or ask a question...")
-final_prompt = prompt or action_prompt or watchlist_prompt
+
+# Click-through from the Home page: it stashes a ticker in session_state then switches here.
+# Gated - only fires when Home actually set it, so it cannot affect normal use.
+incoming_prompt = None
+_incoming = st.session_state.pop("assistant_ticker", None)
+if _incoming:
+    incoming_prompt = (f"Give me a detailed technical and swing analysis on {_incoming} including "
+                       "current trend momentum, key support/resistance, and risk/reward setup.")
+
+final_prompt = prompt or action_prompt or watchlist_prompt or incoming_prompt
 
 if final_prompt:
     st.session_state.messages.append({"role": "user", "content": final_prompt})

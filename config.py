@@ -234,6 +234,21 @@ PROVIDERS = {
 ACTIVE_PROVIDER = "google"
 
 # ============================================
+# NEWS-FEED PROVIDER PRESETS - deliberately ISOLATED from the trading agent above.
+# The home-page news ranker uses its OWN keys (GEMINI_NEWS_API, GROQ_NEWS_API, ...) so news
+# traffic never touches the agent's quota, and this whole block can be rotated/extended
+# without any risk to the backtested trading path. All are OpenAI-compatible (openai client).
+# This is a DISPLAY feature: it ranks headlines, it is NOT a trade signal and is not backtested.
+# Add a provider = one line here + its *_NEWS_API key in .env; switch = change ACTIVE_NEWS_PROVIDER.
+# ============================================
+NEWS_PROVIDERS = {
+    "google":   {"base_url": "https://generativelanguage.googleapis.com/v1beta/openai", "key_env": "GEMINI_NEWS_API", "model": "gemini-3.5-flash", "fallback_model": "gemini-3.5-flash-lite"},
+    "groq":     {"base_url": "https://api.groq.com/openai/v1", "key_env": "GROQ_NEWS_API",     "model": "qwen/qwen3.6-27b"},
+    "deepseek": {"base_url": "https://api.deepseek.com/v1",    "key_env": "DEEPSEEK_NEWS_API",  "model": "deepseek-chat"},
+}
+ACTIVE_NEWS_PROVIDER = "google"
+
+# ============================================
 # SHARED AGENT RULES - single source of truth for agent.py (CLI/Streamlit)
 # and mcp_server.py (Claude Desktop). Keep this in sync per CLAUDE.md.
 # ============================================

@@ -54,12 +54,53 @@ def build_training_dataset(tickers, period="5y", horizon=20):
     return full_df_clean
 
 
+def _row(df, *names):
+    """First matching row of a yfinance statement DataFrame as a Series (newest col first), else None."""
+    if df is None or getattr(df, 'empty', True):
+        return None
+    for n in names:
+        if n in df.index:
+            return df.loc[n].dropna()
+    return None
+
+
+def _statement_fundamentals(stock):
+    """ROCE, cash-conversion, and multi-year revenue/PAT trend from the annual statements.
+    All best-effort: any missing line item -> None, never raises. yfinance statement columns
+    are newest-first. NOTE: these are today's (possibly restated) filings, not point-in-time."""
+    out = {'roce_pct': None, 'cash_conversion': None, 'rev_trend': None, 'pat_trend': None}
+    try:
+        inc, bal, cf = stock.income_stmt, stock.balance_sheet, stock.cashflow
+    except Exception:
+        return out
+
+    ebit = _row(inc, 'EBIT', 'Operating Income')
+    assets = _row(bal, 'Total Assets')
+    cur_liab = _row(bal, 'Current Liabilities', 'Total Current Liabilities')
+    if ebit is not None and assets is not None and cur_liab is not None:
+        cap_employed = assets.iloc[0] - cur_liab.iloc[0]
+        if cap_employed and cap_employed > 0:
+            out['roce_pct'] = round(ebit.iloc[0] / cap_employed * 100, 1)
+
+    ocf = _row(cf, 'Operating Cash Flow', 'Total Cash From Operating Activities')
+    ni = _row(inc, 'Net Income', 'Net Income Common Stockholders')
+    if ocf is not None and ni is not None and ni.iloc[0]:
+        out['cash_conversion'] = round(ocf.iloc[0] / ni.iloc[0], 2)
+
+    rev = _row(inc, 'Total Revenue')
+    if rev is not None and len(rev) >= 2:
+        out['rev_trend'] = [(d.year, float(v)) for d, v in rev.items()]
+    if ni is not None and len(ni) >= 2:
+        out['pat_trend'] = [(d.year, float(v)) for d, v in ni.items()]
+    return out
+
+
 def get_fundamentals(ticker):
     """Fetches fundamental data via yfinance - free, no separate API needed."""
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
-        return {
+        result = {
             'trailing_pe': info.get('trailingPE'),
             'price_to_book': info.get('priceToBook'),
             'market_cap': info.get('marketCap'),
@@ -70,7 +111,9 @@ def get_fundamentals(ticker):
             'revenue_growth_pct': round(info.get('revenueGrowth', 0) * 100, 1) if info.get('revenueGrowth') else None,
             'earnings_growth_pct': round(info.get('earningsGrowth', 0) * 100, 1) if info.get('earningsGrowth') else None,
             'roe_pct': round(info.get('returnOnEquity', 0) * 100, 1) if info.get('returnOnEquity') else None,
-            'debt_to_equity': info.get('debtToEquity'),
+            'debt_to_equity': info.get('debtToEquity'),  # yfinance reports this as a PERCENT (82 = 0.82x)
         }
+        result.update(_statement_fundamentals(stock))
+        return result
     except Exception as e:
         return {'error': str(e)}

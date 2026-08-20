@@ -1,0 +1,570 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+    /* Pure Neutral TradingView & Bloomberg Palette (Zero Purple/Indigo) */
+    --bg-base: #0C0D10;
+    --bg-panel: #131722;
+    --bg-panel-elevated: #1E222D;
+    --bg-surface-hover: #262B38;
+    --border-subtle: #2A2E39;
+    --border-active: #363C4E;
+    
+    /* Terminal Signatures */
+    --accent-amber: #FFA028;
+    --accent-amber-subtle: rgba(255, 160, 40, 0.12);
+    --accent-amber-border: rgba(255, 160, 40, 0.3);
+    
+    /* TradingView Standard Gain & Loss */
+    --tv-green: #089981;
+    --tv-green-bg: rgba(8, 153, 129, 0.14);
+    --tv-red: #F23645;
+    --tv-red-bg: rgba(242, 54, 69, 0.14);
+    
+    /* Contrast Text Hierarchy */
+    --text-primary: #F0F3FA;
+    --text-secondary: #9B9EA4;
+    --text-muted: #6A6D78;
+}
+
+* {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Hide Streamlit default top-right toolbar (Deploy button + 3 dots menu) */
+[data-testid="stToolbar"], 
+#MainMenu, 
+footer,
+div[data-testid="stDecoration"] { 
+    display: none !important;
+    visibility: hidden !important; 
+}
+
+/* Header container: keep transparent and non-interfering */
+header[data-testid="stHeader"] {
+    background: transparent !important;
+    height: 3rem !important;
+    z-index: 9999 !important;
+}
+
+/* Sidebar collapsed toggle button: guaranteed pinned visibility */
+[data-testid="collapsedControl"],
+[data-testid="stSidebarCollapsedControl"] {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: fixed !important;
+    top: 12px !important;
+    left: 14px !important;
+    z-index: 9999999 !important;
+    background: #181C27 !important;
+    border: 1px solid var(--accent-amber) !important;
+    border-radius: 6px !important;
+    color: var(--accent-amber) !important;
+    padding: 6px 10px !important;
+    box-shadow: 0 0 12px rgba(255, 160, 40, 0.3) !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+}
+
+[data-testid="collapsedControl"]:hover,
+[data-testid="stSidebarCollapsedControl"]:hover {
+    background: #222838 !important;
+    box-shadow: 0 0 16px rgba(255, 160, 40, 0.5) !important;
+    transform: scale(1.05);
+}
+
+[data-testid="collapsedControl"] svg,
+[data-testid="stSidebarCollapsedControl"] svg {
+    display: block !important;
+    visibility: visible !important;
+    fill: var(--accent-amber) !important;
+    stroke: var(--accent-amber) !important;
+    color: var(--accent-amber) !important;
+    width: 18px !important;
+    height: 18px !important;
+}
+
+.stApp {
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+}
+
+.block-container {
+    padding-top: 2rem !important;
+    padding-bottom: 2.5rem !important;
+    max-width: 1060px;
+}
+
+/* Terminal Header */
+.terminal-header {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 12px 18px;
+    margin-bottom: 0.5rem;
+}
+
+.terminal-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.terminal-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.terminal-logo {
+    color: var(--accent-amber);
+    font-size: 1.15rem;
+}
+
+.terminal-badge {
+    font-size: 0.65rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--accent-amber);
+    background: var(--accent-amber-subtle);
+    border: 1px solid var(--accent-amber-border);
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.terminal-eod-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--bg-panel-elevated);
+    border: 1px solid var(--border-subtle);
+    padding: 4px 10px;
+    border-radius: 4px;
+    letter-spacing: 0.04em;
+}
+
+.terminal-sub {
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+    letter-spacing: 0.01em;
+}
+
+/* Ticker Marquee Strip */
+.tick-strip {
+    overflow: hidden;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 7px 0;
+    margin-top: 0.35rem;
+    mask-image: linear-gradient(to right, transparent, black 4%, black 96%, transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 4%, black 96%, transparent);
+}
+
+.tick-track {
+    display: inline-flex;
+    white-space: nowrap;
+    animation: scroll-left 32s linear infinite;
+}
+
+.tick {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 12px;
+    margin: 0 4px;
+    border-radius: 4px;
+    background: var(--bg-panel-elevated);
+    border: 1px solid var(--border-subtle);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+}
+
+.tick-sym {
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 0.02em;
+}
+
+.tick-price {
+    color: #D1D4DC;
+    font-weight: 500;
+}
+
+.tick.up .tick-pct {
+    color: var(--tv-green);
+    background: var(--tv-green-bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.tick.down .tick-pct {
+    color: var(--tv-red);
+    background: var(--tv-red-bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+@keyframes scroll-left {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+}
+
+.market-meta-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    padding: 5px 2px;
+    margin-top: 3px;
+}
+
+.market-meta-sep {
+    color: var(--border-subtle);
+}
+
+.news-tag {
+    background: var(--accent-amber-subtle);
+    color: var(--accent-amber);
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--accent-amber-border);
+}
+
+.news-text {
+    color: #D1D4DC;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+/* Sidebar Styling */
+section[data-testid="stSidebar"] {
+    background-color: #090A0D !important;
+    border-right: 1px solid var(--border-subtle);
+}
+
+/* Watchlist Add Ticker Form */
+section[data-testid="stSidebar"] div[data-testid="stForm"] {
+    border: 1px solid var(--border-subtle) !important;
+    background: var(--bg-panel) !important;
+    border-radius: 4px !important;
+    padding: 6px 6px !important;
+    margin-bottom: 8px !important;
+}
+
+section[data-testid="stSidebar"] div[data-testid="stForm"] input {
+    background: #090A0D !important;
+    border: 1px solid var(--border-subtle) !important;
+    color: var(--text-primary) !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 0.74rem !important;
+    padding: 4px 6px !important;
+    border-radius: 3px !important;
+}
+
+section[data-testid="stSidebar"] div[data-testid="stForm"] input:focus {
+    border-color: var(--accent-amber) !important;
+    box-shadow: 0 0 0 1px var(--accent-amber) !important;
+}
+
+section[data-testid="stSidebar"] div[data-testid="stForm"] button {
+    background: var(--bg-panel-elevated) !important;
+    border: 1px solid var(--border-subtle) !important;
+    color: var(--accent-amber) !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-weight: 700 !important;
+    font-size: 0.85rem !important;
+    padding: 2px !important;
+    border-radius: 3px !important;
+}
+
+section[data-testid="stSidebar"] div[data-testid="stForm"] button:hover {
+    border-color: var(--accent-amber) !important;
+    background: var(--accent-amber-subtle) !important;
+}
+
+.sidebar-brand {
+    padding: 4px 0 10px 0;
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 12px;
+}
+
+.sidebar-brand-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--accent-amber);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.sidebar-brand-sub {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.sidebar-section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--accent-amber);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin: 1.1rem 0 0.4rem 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* New Session Button */
+section[data-testid="stSidebar"] button[kind="primary"] {
+    background: #181C27 !important;
+    border: 1px solid var(--border-subtle) !important;
+    color: var(--text-primary) !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 0.8rem !important;
+    font-weight: 600 !important;
+    border-radius: 5px !important;
+    padding: 0.5rem 0.75rem !important;
+    transition: all 0.15s ease !important;
+}
+
+section[data-testid="stSidebar"] button[kind="primary"]:hover {
+    border-color: var(--accent-amber) !important;
+    color: var(--accent-amber) !important;
+    background: #202635 !important;
+}
+
+/* Watchlist Row Buttons in Sidebar */
+.watchlist-row-container [data-testid="stHorizontalBlock"] {
+    align-items: center;
+    margin-bottom: 3px;
+}
+
+.watchlist-row-container [data-testid="stHorizontalBlock"] button {
+    background: var(--bg-panel) !important;
+    border: 1px solid var(--border-subtle) !important;
+    box-shadow: none !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+    color: #E2E8F0 !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 0.74rem !important;
+    padding: 5px 8px !important;
+    border-radius: 4px !important;
+    transition: all 0.15s ease !important;
+}
+
+.watchlist-row-container [data-testid="stHorizontalBlock"] button:hover {
+    background: var(--bg-panel-elevated) !important;
+    border-color: var(--accent-amber) !important;
+    color: #FFFFFF !important;
+}
+
+.watchlist-row-container [data-testid="stHorizontalBlock"] [data-testid="column"]:last-child button {
+    opacity: 0.3 !important;
+    padding: 5px 2px !important;
+    justify-content: center !important;
+    text-align: center !important;
+}
+
+.watchlist-row-container [data-testid="stHorizontalBlock"] [data-testid="column"]:last-child button:hover {
+    opacity: 1 !important;
+    color: var(--tv-red) !important;
+    background: var(--tv-red-bg) !important;
+    border-color: rgba(242, 54, 69, 0.3) !important;
+}
+
+/* History / Conversation List Rows */
+.history-container [data-testid="stHorizontalBlock"] {
+    align-items: center;
+    margin-bottom: 2px;
+}
+
+.history-container [data-testid="stHorizontalBlock"] button {
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    box-shadow: none !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+    color: var(--text-secondary) !important;
+    font-size: 0.78rem !important;
+    padding: 5px 8px !important;
+    border-radius: 4px !important;
+    transition: all 0.15s ease !important;
+}
+
+.history-container [data-testid="stHorizontalBlock"] button:hover {
+    background: var(--bg-panel) !important;
+    border-color: var(--border-subtle) !important;
+    color: var(--text-primary) !important;
+}
+
+.history-container [data-testid="stHorizontalBlock"] [data-testid="column"]:last-child button {
+    opacity: 0.3;
+    padding: 4px !important;
+}
+
+.history-container [data-testid="stHorizontalBlock"] [data-testid="column"]:last-child button:hover {
+    opacity: 1;
+    color: var(--tv-red) !important;
+    background: var(--tv-red-bg) !important;
+    border-color: rgba(242, 54, 69, 0.3) !important;
+}
+
+/* Bloomberg Command Deck (Main Area) */
+.command-deck-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 1.4rem 0 0.6rem 0;
+}
+
+.command-deck-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--accent-amber);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.command-deck-hint {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.main [data-testid="stHorizontalBlock"] button {
+    background: var(--bg-panel) !important;
+    border: 1px solid var(--border-subtle) !important;
+    color: var(--text-primary) !important;
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+    border-radius: 6px !important;
+    padding: 0.75rem 0.9rem !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+    transition: all 0.15s ease !important;
+    min-height: 48px;
+    white-space: pre-line !important;
+}
+
+.main [data-testid="stHorizontalBlock"] button:hover {
+    border-color: var(--accent-amber) !important;
+    background: var(--bg-panel-elevated) !important;
+    box-shadow: 0 0 12px var(--accent-amber-subtle) !important;
+}
+
+/* Chat Messages */
+div[data-testid="stChatMessage"] {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 0.9rem 1.2rem;
+    margin-bottom: 0.75rem;
+}
+
+div[data-testid="stChatMessage"] strong {
+    color: #FFFFFF;
+    font-weight: 600;
+}
+
+div[data-testid="stChatMessage"] code {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg-panel-elevated);
+    color: var(--accent-amber);
+    border: 1px solid var(--border-subtle);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.85em;
+}
+
+/* Chat Input Bar */
+div[data-testid="stChatInput"] {
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+div[data-testid="stChatInput"] textarea {
+    background: #090A0D !important;
+    border: 1px solid var(--border-subtle) !important;
+    color: var(--text-primary) !important;
+    font-size: 0.88rem !important;
+    border-radius: 6px !important;
+}
+
+div[data-testid="stChatInput"] textarea:focus {
+    border-color: var(--accent-amber) !important;
+    box-shadow: 0 0 0 1px var(--accent-amber) !important;
+}
+
+div[data-testid="stChatInput"] button {
+    color: var(--accent-amber) !important;
+}
+
+/* Top nav tabs (st.page_link) styled as terminal tabs */
+[data-testid="stPageLink"] a {
+    font-family: 'JetBrains Mono', monospace !important; font-size: 0.78rem !important;
+    font-weight: 600 !important; border: 1px solid var(--border-subtle) !important;
+    border-radius: 6px !important; padding: 5px 14px !important; background: var(--bg-panel) !important;
+    color: var(--text-secondary) !important;
+}
+[data-testid="stPageLink"] a:hover { border-color: var(--accent-amber) !important;
+    color: var(--accent-amber) !important; }
+[data-testid="stPageLink"] a[aria-current="page"] { color: var(--accent-amber) !important;
+    border-color: var(--accent-amber) !important; background: var(--accent-amber-subtle) !important; }
+
+.news-group {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 700;
+    color: var(--accent-amber); letter-spacing: 0.08em; text-transform: uppercase;
+    margin: 1.4rem 0 0.6rem 0; padding-bottom: 4px; border-bottom: 1px solid var(--border-subtle);
+}
+
+.home-warn { color: var(--accent-amber); font-size: 0.8rem; background: var(--accent-amber-subtle);
+    border: 1px solid var(--accent-amber-border); border-radius: 5px; padding: 8px 12px; margin: 6px 0; }
+.panel-grid { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0; }
+.stat-tile { flex: 1; min-width: 148px; background: var(--bg-panel);
+    border: 1px solid var(--border-subtle); border-radius: 6px; padding: 10px 13px; }
+.stat-label { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--text-muted); }
+.stat-value { font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin-top: 4px;
+    font-family: 'JetBrains Mono', monospace; }
+.stat-sub { font-size: 0.66rem; color: var(--text-secondary); margin-top: 3px; }
+.pos-wrap { overflow-x: auto; }
+.pos-table { width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace;
+    font-size: 0.76rem; }
+.pos-table th { text-align: right; color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase;
+    letter-spacing: 0.05em; padding: 6px 9px; border-bottom: 1px solid var(--border-subtle); white-space: nowrap; }
+.pos-table th:first-child, .pos-table td:first-child { text-align: left; }
+.pos-table td { text-align: right; padding: 7px 9px; border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-primary); white-space: nowrap; }
+.pos-tk { font-weight: 700; color: var(--text-primary); }
+.pnl-pos { color: var(--tv-green); font-weight: 700; }
+.pnl-neg { color: var(--tv-red); font-weight: 700; }
+</style>

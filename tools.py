@@ -638,6 +638,36 @@ def label_roe(value):
         return "Weak"
 
 
+def label_cash_conversion(value):
+    """Operating cash flow / net profit. <0 means profit isn't turning into cash - the key
+    red flag for working-capital-heavy businesses (recyclers, infra, EPC)."""
+    if value is None:
+        return "N/A"
+    if value < 0:
+        return "negative - profit NOT converting to cash (red flag)"
+    elif value < 0.8:
+        return "weak - watch working capital"
+    else:
+        return "healthy - profit converts to cash"
+
+
+def _fmt_cr(v):
+    """Rupees -> compact crore string."""
+    return f"{v / 1e7:,.0f}cr"
+
+
+def format_trend(pairs):
+    """[(year, value), ...] newest-first -> 'FY24 X -> FY25 Y -> FY26 Z (CAGR ..%)' oldest-first."""
+    if not pairs or len(pairs) < 2:
+        return None
+    p = list(reversed(pairs))  # oldest -> newest
+    chain = " -> ".join(f"FY{str(y)[2:]} {_fmt_cr(v)}" for y, v in p)
+    first, last = p[0][1], p[-1][1]
+    yrs = len(p) - 1
+    cagr = ((last / first) ** (1 / yrs) - 1) * 100 if first > 0 and last > 0 else None
+    return chain + (f" (CAGR {cagr:+.0f}%)" if cagr is not None else "")
+
+
 def label_profit_margin(value):
     if value is None:
         return "N/A"
@@ -728,14 +758,34 @@ def get_fundamentals_text(ticker):
         text += f"Business Description (verified, from company filings): {fund['business_summary']}\n"
     else:
         text += "Business Description: Not available - do not guess or invent what this company does.\n"
-    text += f"P/E Ratio: {fund['trailing_pe']} ({label_pe(fund['trailing_pe'])})\n" if fund['trailing_pe'] else "P/E Ratio: N/A\n"
+    text += f"P/E Ratio: {fund['trailing_pe']:.1f} ({label_pe(fund['trailing_pe'])}) - price paid per Rs1 of yearly profit\n" if fund['trailing_pe'] else "P/E Ratio: N/A\n"
     text += f"Revenue Growth (YoY): {fund['revenue_growth_pct']}% ({label_growth(fund['revenue_growth_pct'])})\n" if fund['revenue_growth_pct'] is not None else ""
     text += f"Earnings Growth (YoY): {fund['earnings_growth_pct']}% ({label_growth(fund['earnings_growth_pct'])})\n" if fund['earnings_growth_pct'] is not None else ""
     text += f"Profit Margin: {fund['profit_margin_pct']}% ({label_profit_margin(fund['profit_margin_pct'])})\n" if fund['profit_margin_pct'] is not None else ""
-    text += f"ROE: {fund['roe_pct']}% ({label_roe(fund['roe_pct'])})\n" if fund['roe_pct'] is not None else ""
-    text += f"Debt-to-Equity: {fund['debt_to_equity']} ({label_debt_to_equity(fund['debt_to_equity'])} leverage)\n" if fund['debt_to_equity'] is not None else ""
+    text += f"ROE: {fund['roe_pct']}% ({label_roe(fund['roe_pct'])}) - profit made on shareholders' money\n" if fund['roe_pct'] is not None else ""
+    if fund.get('roce_pct') is not None:
+        text += f"ROCE: {fund['roce_pct']}% ({label_roe(fund['roce_pct'])}) - profit made on ALL money in the business\n"
+    if fund['debt_to_equity'] is not None:
+        de = fund['debt_to_equity'] / 100  # yfinance gives a percent; show the ratio (82 -> 0.82x)
+        text += f"Debt vs own money: {de:.2f}x ({label_debt_to_equity(fund['debt_to_equity'])} leverage) - under 1 = more own money than loans\n"
+    if fund.get('cash_conversion') is not None:
+        text += f"Cash conversion: {fund['cash_conversion']:.2f}x ({label_cash_conversion(fund['cash_conversion'])}) - is the profit real cash or just on paper?\n"
+    rev_t = format_trend(fund.get('rev_trend'))
+    pat_t = format_trend(fund.get('pat_trend'))
+    if rev_t:
+        text += f"Sales over the years: {rev_t} - is the business getting bigger?\n"
+    if pat_t:
+        text += f"Profit over the years: {pat_t} - is it actually earning more?\n"
     if fund['trailing_pe'] and fund['trailing_pe'] > 100:
-        text += "NOTE: Very high P/E - check if growth genuinely supports this.\n"
+        text += "NOTE: Very high P/E - the price already assumes big growth; risky if growth slips.\n"
+    if any(fund.get(k) is not None for k in ('roce_pct', 'cash_conversion', 'rev_trend')):
+        text += (
+            "\nHOW TO USE THIS (plain): the numbers above describe the BUSINESS, not the trade. We "
+            "tested them (backtest_fundamentals.py) and they do NOT predict the next few weeks' price "
+            "move - z<2, basically no effect - so they NEVER change the scan's buy/sell call. Use them "
+            "only as a sturdiness check AFTER a name is flagged: rising sales+profit and healthy cash = "
+            "a solid business you can size normally; red flags (cash conversion negative, high debt, "
+            "profit shrinking) = fragile, so trade smaller or skip even if the chart looks great.\n")
     return text
 # ============= SHARED =============
 
@@ -752,7 +802,9 @@ def get_institutional_activity_text(ticker):
             latest_delivery = match.sort_values('DATE_FETCHED').iloc[-1]['DELIV_PER']
             if pd.notna(latest_delivery):
                 trend = "above average" if latest_delivery > avg_delivery else "below average"
-                text += f"Delivery %: {latest_delivery:.2f}% latest ({label_delivery(latest_delivery)}), {avg_delivery:.2f}% avg over last {len(match)} trading days ({trend})\n\n"
+                text += f"Delivery %: {latest_delivery:.2f}% latest ({label_delivery(latest_delivery)}), {avg_delivery:.2f}% avg over last {len(match)} trading days ({trend})\n"
+                text += ("  In plain words: of all shares traded, how many buyers actually took them home vs just day-traded and flipped. "
+                         "Higher = real buyers stepping in. What to do: use it as a small confidence tick behind a setup, never as a buy signal on its own.\n\n")
             else:
                 text += "Delivery %: latest value unavailable.\n\n"
         else:
@@ -768,6 +820,8 @@ def get_institutional_activity_text(ticker):
             text += f"Recent bulk deals ({len(matches)} found):\n"
             for _, row in matches.head(5).iterrows():
                 text += f"  {row['Date']}: {row['ClientName']} {row['Buy/Sell']} {row['QuantityTraded']} shares @ ₹{row['TradePrice/Wght.Avg.Price']}\n"
+            text += ("  In plain words: a bulk deal = one big investor bought or sold a large chunk in the open market and had to report it to NSE. "
+                     "What to do: a big BUY by a known name is a mild positive, a big SELL is a mild caution - context, not a signal to act on.\n")
     except Exception as e:
         text += f"Bulk deal data unavailable: {e}\n"
     return text
@@ -798,6 +852,9 @@ def get_market_regime_text():
 
         if breadth['regime'] == "Broadly Bearish":
             text += "CAUTION: Broad market conditions are weak - momentum/breakout setups are statistically less reliable in this environment.\n"
+        text += ("In plain words: this is the whole market's mood. 'Breadth' = how many stocks are trending up; VIX = the market's fear level "
+                 "(low = calm, high = scared). What to do: when the mood is healthy/calm your setups tend to work more often, so trade normally; "
+                 "when it's weak or fearful they misfire more, so take fewer trades and size smaller.\n")
         return text
     except Exception as e:
         return f"Market regime data unavailable: {e}"
@@ -1688,19 +1745,21 @@ def get_news_flags(ticker, max_rows=20):
         else:
             clear += 1
     if not flagged:
-        return (f"{ticker}: screened {len(matches)} recent NSE filing(s), NO red-flag keywords matched. "
-                f"Keyword screen of NSE filings only - clean here does NOT mean safe, and it does not cover "
-                f"press or analyst news outside NSE filings.")
-    text = f"{ticker} - RED-FLAG SCREEN of cached NSE filings (UNVALIDATED, informational; direction never predictable):\n\n"
+        return (f"{ticker}: I read the last {len(matches)} official filings this company sent to the exchange and found "
+                f"nothing worrying in them. Note: this only checks NSE filings - it can't see newspaper or analyst news, "
+                f"so 'nothing found' is reassuring but not a guarantee it's safe.")
+    text = (f"{ticker} - SAFETY CHECK of the company's recent official filings. I flagged the ones below because their "
+            f"wording matches known trouble words (fraud, dilution, downgrades, management exits, etc.). This is a "
+            f"heads-up to go read them, NOT a prediction of the price:\n\n")
     for row, cats in flagged:
         text += f"  [{' / '.join(cats)}] {row['an_dt']}: {row['desc']}\n"
         detail = (row.get('attchmntText') or '').strip()
         if detail and detail.lower() != str(row['desc']).strip().lower():
             text += f"    Filing text: {detail[:300]}\n"
-    text += (f"\n  ({clear} other recent filing(s) matched no red-flag keyword.)\n"
-             f"  A match is a prompt to READ the filing, not a verdict. An oversold stock with a genuine red flag "
-             f"(fraud, dilution, insolvency, downgrade) may be oversold for a reason the mean-reversion edge does "
-             f"not cover - verify the actual filing before trading.\n")
+    text += (f"\n  ({clear} other recent filing(s) looked clean.)\n"
+             f"  What to do: open and read the flagged filing before you trust the chart. A stock that has fallen hard "
+             f"might have fallen for a real reason (fraud, dilution, insolvency, a downgrade) - if so, the 'it's cheap now' "
+             f"bounce you're betting on may not come. When in doubt, skip it.\n")
     return text
 
 

@@ -12,4 +12,5 @@ requests
 xlrd>=2.0.1
 scipy
 streamlit
+feedparser
 mcp
