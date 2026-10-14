@@ -20,6 +20,10 @@ under better statistics:
 3. **Naive vs paired inference** — `open_offer` news events showed naive z=7.17 and paired z=0.44.
    The naive number was high only because the *control* was also losing.
 
+4. **Overlap in time, again** (2026-09) — the long-term momentum basket entered *every day* with a
+   20-day hold, so each month was counted ~20 times. Headline z ~9.5 → **~1.9** on non-overlapping
+   monthly rebalances. For any hold longer than a day, sample entries every `hold` sessions.
+
 So: **never present a number without saying how it was measured.** If you find yourself about to
 say "this clearly works", that is the exact moment the project has historically been wrong.
 
@@ -48,11 +52,10 @@ say "this clearly works", that is the exact moment the project has historically 
 python refresh_cache.py          # daily; several minutes, downloads 748 stocks
 python main.py                   # CLI — always picks up latest code
 streamlit run Home.py            # news home + Assistant tab; manual restart after code changes
-python news_watcher.py --once --dry --force   # phone watcher, sends nothing
 ```
 
 Tests are plain files, no framework, no network:
-`test_user_trade.py` `test_discipline.py` `test_trade_journal.py` `test_news_watcher.py`
+`test_user_trade.py` `test_discipline.py` `test_trade_journal.py`
 `test_alert_watcher.py` `test_telegram_bot.py` `test_category_flows.py`
 plus `python backtest_engine.py` (self-check).
 
@@ -88,19 +91,22 @@ On Windows use `PYTHONIOENCODING=utf-8` or ₹ symbols crash the console.
 
 ---
 
-## Phone deployment constraints (news_watcher.py)
+## The news watchers live in a DIFFERENT repo now
 
-Runs on a spare Android under Termux. It deliberately imports **neither pandas nor nsefin, and
-does not import `config.py`** — all three pull pandas, which compiles from source on Android and
-routinely fails. It reads the watchlist with the `csv` module and calls NSE over plain HTTP.
+`news_watcher.py` (NSE filings) and `news_market_watcher.py` (market/sector news) moved out on
+2026-08-30 to **`D:/nishant tp/extra phone creativity/news-watcher-automation-tool`**. They run
+24/7 on a spare Android under Termux and share nothing with the backtested path — do not add
+them back here.
 
-**If you add an import to `news_watcher.py` or `notify.py`, check it is pure-Python.** The only
-dependencies on the phone are `requests` and `python-dotenv`. `tools.py` is imported lazily
-inside `_context_for()` and allowed to fail, so the phone degrades gracefully.
+What that means for this repo:
+- `notify.py` stayed, because `alert_watcher.py` and `telegram_bot.py` import it. The news repo
+  has its own copy. They are independent; a change here does not reach the phone.
+- `nse_watchlist_expanded.csv` is duplicated there too. **If you regenerate the watchlist,
+  copy it across** or the phone silently keeps scanning the old universe.
+- `build_news_archive.py` used to import the NSE constants from `news_watcher.py` and now
+  carries its own. It is the only thing here that still talks to the announcements endpoint.
 
-Deploy: `adb` lives at `~/AppData/Local/Android/Sdk/platform-tools/adb.exe` (not on PATH).
-Set `MSYS_NO_PATHCONV=1` in Git Bash. Push to `/sdcard/Download/`, then `cp` from inside Termux —
-adb cannot write into Termux's private home. `find /sdcard` does not work on that device; use `ls`.
+`alert_watcher.py` is unrelated to the news tool and stays — it watches prices on open trades.
 
 ---
 

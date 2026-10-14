@@ -175,7 +175,11 @@ Both produced confident, wrong answers. Expect them.
 1. **Look-ahead in percentile filters.** Ranking with `rank(pct=True)` or `.iloc[-1]` over the
    *whole* sample uses future information. Every percentile — liquidity, volatility — must be
    computed **point-in-time** (trailing window only). This error was made twice.
-2. **Pooling trades per-ticker breaks any time-series analysis.** `[all of stock A, then all of
+2. **Never build a control group by index on the raw panel.** `build_rows` is a per-ticker
+   `pd.concat`, so row indices are **not unique** - `~df.index.isin(sel.index)` silently drops
+   unrelated rows and produced a confident wrong answer in `backtest_sector_rank.py` (2026-09).
+   `reset_index(drop=True)` first, then use boolean masks.
+3. **Pooling trades per-ticker breaks any time-series analysis.** `[all of stock A, then all of
    stock B]` is not chronological. Sort trades by entry date before CUSUM, decay diagnosis, or
    anything fold-based, or the buckets are meaningless.
 

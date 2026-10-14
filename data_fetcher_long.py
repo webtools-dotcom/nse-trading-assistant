@@ -68,7 +68,8 @@ def _statement_fundamentals(stock):
     """ROCE, cash-conversion, and multi-year revenue/PAT trend from the annual statements.
     All best-effort: any missing line item -> None, never raises. yfinance statement columns
     are newest-first. NOTE: these are today's (possibly restated) filings, not point-in-time."""
-    out = {'roce_pct': None, 'cash_conversion': None, 'rev_trend': None, 'pat_trend': None}
+    out = {'roce_pct': None, 'cash_conversion': None, 'rev_trend': None, 'pat_trend': None,
+           'interest_cover': None}
     try:
         inc, bal, cf = stock.income_stmt, stock.balance_sheet, stock.cashflow
     except Exception:
@@ -81,6 +82,12 @@ def _statement_fundamentals(stock):
         cap_employed = assets.iloc[0] - cur_liab.iloc[0]
         if cap_employed and cap_employed > 0:
             out['roce_pct'] = round(ebit.iloc[0] / cap_employed * 100, 1)
+
+    # Interest cover, not just D/E: a company can carry heavy debt and service it comfortably,
+    # or carry little and still choke on it. This is the number that separates the two.
+    interest = _row(inc, 'Interest Expense', 'Interest Expense Non Operating')
+    if ebit is not None and interest is not None and interest.iloc[0]:
+        out['interest_cover'] = round(ebit.iloc[0] / abs(interest.iloc[0]), 1)
 
     ocf = _row(cf, 'Operating Cash Flow', 'Total Cash From Operating Activities')
     ni = _row(inc, 'Net Income', 'Net Income Common Stockholders')

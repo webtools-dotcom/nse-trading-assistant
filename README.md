@@ -192,8 +192,8 @@ CUSUM alarm is not raised (10% of trigger). Trade smaller until this resolves.
 
 | | |
 |---|---|
-| **Signal (validated 2026-08)** | **Cross-sectional 12-month momentum** — rank the liquid Mid/Small universe, buy the top-quartile **basket**. Day-clustered **z ~9.5 out-of-sample**, net ~+1.5%/trade over ~20 days (`backtest_longterm_xsec.py`, `backtest_longterm_oos.py`). Low-vol names within the basket add return (quality-momentum tilt). |
-| **Exit** | Fixed −8% stop-loss / +16% target, ~monthly rebalance |
+| **Signal** | **Cross-sectional 12-month momentum** — rank the liquid Mid/Small universe, buy the top-quartile **basket**. Re-measured 2026-09 on **non-overlapping monthly rebalances**: edge **~+0.6%/month** over the universe, **z_paired median 1.94** across 20 start offsets (range 1.32–2.73, 9/20 clear 2.0). **Full history (2026-09, `backtest_longterm_history.py`, `longterm_history_results.md`): 139 monthly rebalances 2014–2026, edge +0.75%/month, z_paired 3.29 (2.63–3.79, 20/20 offsets ≥ 2), positive in every era incl. 2014–2021 which no earlier test saw.** Survivorship-flattered (today's listed names only). The old "z ~9.5" entered every day with a 20-day hold and counted each month ~20× (`backtest_longterm_exits.py`). The old "low-vol names add return" claim was **backwards** on the same re-check — low-atr% names return ~0.8%/month *less* but carry half the −20% tail (`longterm_recheck_results.md`). |
+| **Exit** | Hold ~20 sessions, then re-rank. **No fixed stop/target** — see below. |
 | **⚠️ Crash risk** | Momentum is high-return, high-drawdown: **2 of 5 backtested years were negative** (winners underperformed). Hold a diversified basket, size small. |
 
 **Legacy near-52w-high screen, re-validated honestly** (was 2.9× overlap-inflated):
@@ -205,6 +205,12 @@ CUSUM alarm is not raised (10% of trigger). Trade smaller until this resolves.
 | Large-cap | 2.28 | **0.34** | ❌ Dead — retired |
 
 > The near-high *screen* only ever worked in Small-cap; the cross-sectional momentum *rank* above is the stronger validated signal and works across Mid+Small.
+
+> ⚠️ **Over-extension: lower return NO, higher blow-up risk YES** (measured 2026-09, `backtest_longterm_extension.py`, `longterm_extension_results.md`). Mean return *rises* with momentum (30-60% band +1.01%/trade → 400%+ band +3.21%), so an over-extension **cut is rejected** — it would delete the best names. But the left tail rises monotonically with it: **P(down >20% in 20 days) runs 2% / 3% / 3% / 5% / 6%** across the 30-60 / 60-100 / 100-200 / 200-400 / 400%+ bands, 10th-percentile outcome −12.0% → −17.1%. A 20-name basket absorbs that tail; a 1-2 name position does not. Shipped as a **per-name risk label** in the scan (`config.momentum_tail_risk`), not a filter.
+
+> ❌ **The −8% stop / +16% target was never validated on this signal — and it hurts** (2026-09, `backtest_longterm_exits.py`, `longterm_exits_results.md`). On the top-quartile basket, monthly non-overlapping, costs charged: stop+target **−1.70%/trade vs plain hold, z_paired −3.39, worse in 5/5 periods**; stop alone −1.53% (z −3.65, median over 20 offsets −2.55). Median trade goes from +0.18% to −6.23%: momentum names dip 8% and recover. The stop *does* cut P(down >20%) from 3.1% → 0.2% — a real trade-off for a 1–2 name holder, shown not prescribed. Target alone: −0.24%, not significant. 60d hold vs 3×20d: +0.6–1.5%/60d on the quartile (z 0.75–2.43, likely just fewer round-trip costs), nothing on the top 20 — inconclusive.
+
+> 🚫 The scan's momentum-descending sort is correct — its weak part is the tail (top 20 +1.92%/trade vs +1.13% for the rest), so default depth is now 20.
 
 > 🚫 RSI-oversold at the 1-month horizon *underperformed* random (z=-2.98) — mean-reversion and momentum are opposite effects at different horizons.
 
@@ -230,6 +236,13 @@ They are listed so nobody spends another day rediscovering them.
 | Trading big single-day gainers (pre-signal or post-pop drift) | No pre-move tell (day-before ≈ random); post-pop drift ≤ random. Money was intraday only | (2026-08) |
 | Illiquid small-caps (below the ₹25cr floor) | Gross edge comparable, but ~3× costs make every band net-negative — a cost wall, not a signal gap | (2026-08) |
 | **Post-earnings-miss as a safety filter** (skip oversold names that just reported badly) | Bad-earnings oversold names do NOT underperform — FILTER z_paired −0.19→+2.38 across 6 specs; the miss IS the overreaction reversion feeds on. Reversed only after a look-ahead fix | `pead_results.md` |
+| **Over-extension / stretch FILTER on the long-term basket** (skip names that already surged, are far above the 200DMA, at the 52w high, or high-RSI) | Rejected as a *filter*: mean return **rises** with momentum (+1.01% → +3.21%/trade), so the cut deletes the best names. But the **tail risk** half of the idea was right and shipped as a label — P(−20%) 2%→6% across bands | `longterm_extension_results.md` |
+| Rally-age filter ("don't buy day one of the rally") | Pooled effect real (fresh −2.37, 1-month-in +2.66) but dead in the recent third (2.98 / 0.77 / −0.06) — fails stability | same |
+| **Frog-in-the-pan / smooth momentum** (prefer names whose 12M gain came in many small steps — Da, Gurun & Warachka 2014) | Pre-registered direction FAILED: smooth half returned **−1.03%/month vs the jumpy half**, z_paired median −2.20, 0/5 periods. Tail identical (3.2% vs 3.1%). The reversal is post-hoc and weakens inside vol halves (z −1.51 / −0.88) — not adopted in either direction | `longterm_recheck_results.md` |
+| **Market-state gate on the momentum basket** (sit out when Nifty's 12M return < 0 — Cooper et al. 2004, Daniel & Moskowitz 2016) | Pre-registered, FAILED: only 5/49 months were DOWN, and the basket did *better* in them (+2.88% vs +1.41%, edge +1.01% vs +0.54%); Welch z 0.52 (−0.66..1.72 over offsets). The 5 worst basket months (−8% to −13%) all came with Nifty 12M **positive** (+5% to +30%) — the crashes here were sell-offs from highs, not rebounds from bears. Not re-fitted to that: 5 months is not a sample | `longterm_marketstate_results.md` |
+| **Low-vol tilt on the momentum basket** (was shown as adding return) | Backwards on monthly non-overlapping re-check: −0.81%/month vs high-atr%, 0/5 periods. Kept only as a risk label (P(<−20%) 2.1% vs 4.2%) | same |
+| **Sector strength as a ranking input** (reorder the long-term basket by how hot the stock's sector is) | Failed in 3 forms: combined rank best z_paired **1.80** (2/5 periods); hottest-sector tilt returned **less** than the momentum-only control it should beat (+2.31% vs +2.43%, 2/5 periods); granular 105-label industries were **worse** than the 20 coarse NSE buckets. Q5 looked strong (z 7.85) only because its control included the known-weak rank-21+ tail | `sector_rank_results.md` |
+| Upstox API as a sector-data source | Company Profile returns `sector` only, no industry/sub-industry, ISIN per call; instruments master has no classification. Coarser than free yfinance | same |
 | **Momentum Breakout / VCP swing** (buy strength in tight consolidation instead of RSI<30 dips) | Failed to demonstrate edge on the 5-year panel — every cap tier DEAD/FAIL (z_paired 0.90 / 0.20 / 0.48; Mid+Small combined 1.26), and the 0–100 confluence score used to rank candidates has zero correlation with forward return (r=−0.009, p=0.86) | `backtest_breakout.py` |
 
 **What survived and got adopted:**

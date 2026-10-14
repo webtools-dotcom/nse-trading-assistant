@@ -31,7 +31,7 @@ def scan_breakout_swings(limit: int = 10) -> str:
 
 @mcp.tool()
 def scan_long_term(limit: int = 15) -> str:
-    """Long-term (~1 month) MOMENTUM scan: ranks the liquid Mid/Small universe by 12-month momentum and surfaces the VALIDATED top quartile as a diversified BASKET (day-clustered z ~9.5 out-of-sample, net ~+1.5%/trade). Buy strength. WARNING: momentum crashes periodically - hold several names, rebalance ~monthly, size small; not a single pick."""
+    """Long-term (~1 month) MOMENTUM scan: ranks the liquid Mid/Small universe by 12-month momentum and surfaces the VALIDATED top quartile as a diversified BASKET (2014-2026 monthly: ~+0.75%/month over the universe, z_paired 3.3, survivorship-flattered; hold ~20 sessions, no fixed stop/target - they measured harmful). Buy strength. WARNING: momentum crashes periodically - hold several names, rebalance ~monthly, size small; not a single pick."""
     return scan_watchlist_text_long_momentum(limit)
 
 

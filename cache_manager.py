@@ -19,11 +19,14 @@ CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
 PRICE_CACHE_FILE_SHORT = os.path.join(CACHE_DIR, "price_data_short.pkl")
 PRICE_CACHE_FILE_LONG = os.path.join(CACHE_DIR, "price_data_long.pkl")
 BULK_DEALS_CACHE_FILE = os.path.join(CACHE_DIR, "bulk_deals_data.pkl")
+SHAREHOLDING_ARCHIVE_FILE = os.path.join(CACHE_DIR, "shareholding_archive.pkl")
+PLEDGE_SNAPSHOT_FILE = os.path.join(CACHE_DIR, "pledge_snapshot.pkl")
 CACHE_META_FILE = os.path.join(CACHE_DIR, "cache_meta.pkl")
 DELIVERY_HISTORY_FILE = os.path.join(CACHE_DIR, "delivery_history.pkl")
 RESULTS_CACHE_FILE = os.path.join(CACHE_DIR, "upcoming_results.pkl")
 NIFTY_CACHE_FILE = os.path.join(CACHE_DIR, "nifty_data.pkl")
 SECTOR_RS_CACHE_FILE = os.path.join(CACHE_DIR, "sector_rs_data.pkl")
+INDUSTRY_MAP_FILE = os.path.join(CACHE_DIR, "industry_map.pkl")
 MARKET_BREADTH_CACHE_FILE = os.path.join(CACHE_DIR, "market_breadth.pkl")
 CORP_ANNOUNCEMENTS_CACHE_FILE = os.path.join(CACHE_DIR, "corp_announcements.pkl")
 VIX_CACHE_FILE = os.path.join(CACHE_DIR, "vix_data.pkl")
@@ -108,7 +111,7 @@ def _save_price_cache_no_regress(all_features, cache_file, label):
     return all_features
 
 
-def _retry_missing(missing, all_features, feature_fn, label, chunk_size=25):
+def _retry_missing(missing, all_features, feature_fn, label, chunk_size=25, period="2y"):
     """Second pass over tickers that came back empty.
 
     Most first-pass failures are throttling, not delisting - a smaller, slower retry usually
@@ -119,7 +122,7 @@ def _retry_missing(missing, all_features, feature_fn, label, chunk_size=25):
     print(f"  retrying {len(missing)} {label} ticker(s) that returned no data...")
     time.sleep(5)
     try:
-        raw = chunked_download(missing, chunk_size=chunk_size, period="2y",
+        raw = chunked_download(missing, chunk_size=chunk_size, period=period,
                                interval="1d", auto_adjust=True)
     except Exception as e:
         print(f"  retry failed: {e}")
@@ -194,6 +197,18 @@ def get_data_date():
 
 def load_bulk_deals_cache():
     return _load_pickle(BULK_DEALS_CACHE_FILE, "bulk deals")
+
+
+def load_shareholding_archive():
+    """Quarterly promoter-holding history per symbol. Built by build_shareholding_archive.py,
+    NOT by refresh_cache.py - it changes four times a year, not daily."""
+    return _load_pickle(SHAREHOLDING_ARCHIVE_FILE, "shareholding archive")
+
+
+def load_pledge_snapshot():
+    """Current promoter-pledge percentages. NSE serves only the latest filing, so unlike the
+    holding archive this has no history and can never be backtested."""
+    return _load_pickle(PLEDGE_SNAPSHOT_FILE, "pledge snapshot")
 
 def backfill_delivery_history(tickers, target_days=30, max_calendar_days_back=50):
     """One-time backfill: pulls the last ~30 trading days of delivery data. Run this once."""
@@ -340,6 +355,19 @@ def refresh_nifty_cache():
 
 def load_nifty_cache():
     return _load_pickle(NIFTY_CACHE_FILE, "Nifty")
+
+def load_industry_map():
+    """Granular yfinance industry per ticker (build_industry_map.py). ~145 labels, vs the 20
+    macro buckets in the watchlist CSV - "Capital Goods" (113 stocks) becomes Aerospace & Defense,
+    Specialty Industrial Machinery, etc. Empty dict if never built; callers degrade gracefully."""
+    if not os.path.exists(INDUSTRY_MAP_FILE):
+        return {}
+    try:
+        with open(INDUSTRY_MAP_FILE, 'rb') as f:
+            return pickle.load(f)
+    except Exception:
+        return {}
+
 
 def refresh_sector_relative_strength():
     """Computes each stock's 60-day momentum relative to its own industry peers - 

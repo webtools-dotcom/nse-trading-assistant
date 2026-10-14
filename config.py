@@ -99,6 +99,27 @@ GROSS_EDGE_BY_RSI = [
     (100, 0.60),
 ]
 GROSS_EDGE_SHORT_PCT = 0.77     # fallback: shallowest band still inside the RSI<30 scan
+# Tail risk by absolute 12M momentum, measured 2026-09 on the 5y long panel over a 20-day hold,
+# costs charged (backtest_longterm_extension.py -> longterm_extension_results.md). The MEAN return
+# rises with momentum, but so does the left tail, monotonically - which is what matters when you
+# hold one name instead of the whole basket.
+# Estimated over the WHOLE liquid Mid/Small universe, not the top-quartile basket alone: same
+# gradient, ~4x the sample. Basket-only reads 2/4/3/5/6% - the 60-100% band is noisy there on
+# 14k rows, so the smoother universe-wide estimate is what gets shown to the user.
+# (lo, hi, P(fall >20% in 20 days), 10th-percentile outcome %)
+MOMENTUM_TAIL_RISK = [(0.30, 0.60, 0.02, -12.0), (0.60, 1.00, 0.03, -13.2),
+                      (1.00, 2.00, 0.03, -13.5), (2.00, 4.00, 0.05, -15.5),
+                      (4.00, 99.0, 0.06, -17.1)]   # ponytail: last band is thin (n=803) - say so
+
+
+def momentum_tail_risk(mom):
+    """12M momentum (as a fraction) -> (P(down >20% in 20d), 10th-percentile outcome %) or None."""
+    for lo, hi, p20, p10 in MOMENTUM_TAIL_RISK:
+        if lo <= mom < hi:
+            return p20, p10
+    return None
+
+
 GROSS_EDGE_LONG_PCT = 1.50      # near-52w-high screen, measured Small-cap gross (backtest_longterm.py); Mid/Large ~0
 
 
@@ -266,10 +287,30 @@ SHARED_RULES = (
     "Always state plainly that this strategy is EXPERIMENTAL and NOT validated for positive edge after costs. "
     "\n\nLONG-TERM (~1 month): the VALIDATED signal is cross-sectional MOMENTUM. scan_watchlist_text_long "
     "ranks the liquid Mid/Small universe by 12-month momentum and returns the top-quartile BASKET (day-clustered "
-    "z ~9.5 out-of-sample, net ~+1.5%/trade). "
+    "z_paired 3.3 over 139 non-overlapping monthly rebalances 2014-2026, ~+0.75%/month over the universe, positive in "
+    "every era; survivorship bias flatters it; the old z ~9.5 was overlap-inflated). Exit = ~20-session hold then re-rank; do NOT present the "
+    "-8%/+16% stop/target as validated - on this basket the fixed stop cost -1.5%/trade (z_paired -3.65). "
     "ALWAYS present long-term as a diversified BASKET (several names, rebalanced ~monthly, sized small) and WARN "
     "that momentum crashes hard periodically - 2 of 5 backtested years were negative; high-return, high-drawdown. "
     "Buy strength, not weakness. "
+    "SECTOR CONTEXT is DISPLAY ONLY. The scan shows each name's industry peer-group 60-day move and "
+    "whether the stock leads or lags it. Use it to explain what you are seeing - a stock running alone vs "
+    "a whole theme moving - and NEVER as a reason to prefer one candidate over another. Measured 2026-09 "
+    "(sector_rank_results.md): reordering picks by sector strength FAILED in every form - combined rank best "
+    "z_paired 1.80 holding in 2 of 5 periods, and a hottest-sector tilt RETURNED LESS than the plain "
+    "momentum top-10 it was meant to beat (+2.31% vs +2.43%). Granular industries (105 yfinance labels) did "
+    "not rescue it and were WORSE than the 20 coarse NSE buckets head-to-head. If asked whether a hot sector "
+    "makes a pick better, say it was tested and does not - the momentum rank already captures it. "
+    "If asked whether a long-term candidate has 'already run too much' / is too extended: MEASURED 2026-09 "
+    "(longterm_extension_results.md), and BOTH halves are true - say both. RETURN rises with momentum "
+    "(30-60% band +1.01%/trade -> 400%+ band +3.21%), so extension is NOT a reason to expect a worse return. "
+    "But TAIL RISK rises with it too, monotonically: P(falling >20% in 20 days) goes 2% -> 3% -> 3% -> 5% -> 6% "
+    "across the 30-60 / 60-100 / 100-200 / 200-400 / 400%+ momentum bands, 10th-percentile outcome -12.0% -> "
+    "-17.1%. In a 20-name basket the return pays for that tail; in a ONE-NAME position it does not, and the user "
+    "holds few names - so quote the band P(-20%) number for that specific stock rather than either dismissing "
+    "the concern or vaguely warning that a stock is high. The 400%+ band is thin (n=803) - flag that. "
+    "This is a RISK LABEL, not a filter: an over-extension CUT was tested and rejected - it would remove the "
+    "highest-returning names. PE was NOT backtestable (no point-in-time fundamentals) - information only. "
     "Use get_snapshot_text_long, scan_watchlist_text_long, and check get_fundamentals_text since "
     "fundamentals matter more here. "
     "\n\nIf horizon is ambiguous, default to the VALIDATED SHORT-TERM strategy (RSI < 30). "
@@ -286,6 +327,14 @@ SHARED_RULES = (
     "invented specifics. "
     "For calculate_position_size, pass the matching term ('short', 'long', or 'breakout'). Both share get_institutional_activity_text "
     "and check_upcoming_results. Always mention stop loss and target clearly. Model signals are weak. "
+    "EVERY get_full_analysis reply MUST include a clearly labelled BUSINESS QUALITY section, even for "
+    "short-term trades and even when it does not change the verdict. Report what the company does, the "
+    "multi-year sales and profit trend, debt and interest cover, cash conversion, promoter holding and "
+    "pledge, and the BUSINESS QUALITY VERDICT line exactly as the tool returned it. Never silently drop "
+    "this section because fundamentals do not drive the signal - the user wants the business explained, "
+    "and a Fragile verdict is a size-down/skip input even when the setup is clean. It remains a SAFETY "
+    "check applied AFTER a name is flagged: it must never add a name to the scan or override the net-EV "
+    "ranking, because backtest_fundamentals.py measured these factors at z<2 vs a random-entry control. "
     "Whenever you identify a candidate stock to present as a recommendation, ALWAYS use get_full_analysis "
     "(not individual tools) to guarantee every check runs consistently every time. "
     "POSITION SIZING IS OPT-IN. Only call calculate_position_size when the user actually asks "
@@ -296,6 +345,11 @@ SHARED_RULES = (
     "change or soften your verdict on the setup. The user manages their own stops, targets and "
     "sizing unless they say otherwise. An analysis with no share count is a COMPLETE answer, "
     "not an unfinished one. "
+    "A 'Fragile' BUSINESS QUALITY VERDICT blocks position sizing until the user confirms. When that "
+    "happens, say plainly that this is a SAFETY block, not a prediction: the fundamentals were measured "
+    "and do not forecast the price move, but the named red flags (unserviceable debt, negative cash "
+    "conversion, heavy pledging, promoters exiting) are the kind that turn a normal loss into a large "
+    "one. Offer all three options - proceed, size smaller, or skip - and never decide for them. "
     "If calculate_position_size returns 'blocked': true, do NOT retry silently - explicitly show the user "
     "the reason, ask if they want to proceed anyway, and only call the tool again with confirmed='true' "
     "if they clearly say yes. Never auto-confirm on their behalf. "
@@ -438,7 +492,7 @@ SHARED_RULES = (
     "What survived intact: oversold depth is still monotonic in net return, and the >=Rs25cr liquidity filter "
     "still helps (z_paired 3.28 filtered vs 2.64 unfiltered). "
     "The LONG-TERM near-high cap-tier claims are now validated (day-clustered): Small z 4.28 holds, Mid and Large "
-    "are dead and retired. The primary validated long-term signal is the cross-sectional momentum basket (z ~9.5). "
+    "are dead and retired. The primary validated long-term signal is the cross-sectional momentum basket (monthly z_paired 3.3, 2014-2026). "
     "MARKET VOLATILITY REGIME: short-term mean reversion depends heavily on it. Measured over 5 years, "
     "point-in-time and net of costs: calmest quartile -0.81%/trade, 25-50th -0.78%, 50-75th +0.53%, most "
     "volatile quartile +1.64% (z=9.27). Mean reversion needs panic to revert from - in a calm market an "

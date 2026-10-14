@@ -11,14 +11,15 @@ from trade_journal import (check_exit_signals, log_trade_entry, log_trade_exit, 
 from cache_manager import (
     load_sector_rs_cache, load_market_breadth_cache, load_vix_cache, load_corp_announcements_cache,
     load_price_cache_short, load_price_cache_long, load_bulk_deals_cache,
-    get_cache_age, get_data_date, load_delivery_history, load_upcoming_results, load_nifty_cache
+    get_cache_age, get_data_date, load_delivery_history, load_upcoming_results, load_nifty_cache,
+    load_shareholding_archive, load_pledge_snapshot, load_industry_map
 )
 from meta_label import score_latest
 from config import (
     CAP_BUCKET_MAP, SHORT_FEATURE_COLUMNS, SHORT_MODEL_PATH,
     LONG_FEATURE_COLUMNS, LONG_MODEL_PATH, LONG_HORIZON_DAYS, LONG_STOP_PCT, LONG_TARGET_PCT,
     DEFAULT_CAPITAL, DEFAULT_RISK_PCT, MAX_RISK_PCT,
-    MIN_TURNOVER_INR, GROSS_EDGE_SHORT_PCT, GROSS_EDGE_LONG_PCT, round_trip_cost_pct,
+    MIN_TURNOVER_INR, GROSS_EDGE_SHORT_PCT, GROSS_EDGE_LONG_PCT, momentum_tail_risk, round_trip_cost_pct,
     gross_edge_for_rsi, vol_regime_multiplier, gross_edge_for_meta, META_MIN_TRADEABLE,
     SHORT_STOP_ATR_MULT, red_flags_in
 )
@@ -177,10 +178,32 @@ def get_swing_levels_short(ticker, stock_df=None):
     elif change_1yr < -20:
         trend_tier = 'Downtrend'
     else:
-        trend_tier = 'Flat/Mild'    
+        trend_tier = 'Flat/Mild'
+
+    # Golden-cross uptrend regime (strategy 035 refinement): close>sma_200 AND sma_50>sma_200.
+    # Structural MA alignment - a DIFFERENT axis from trend_tier, which is a 1-yr return bucket.
+    # WATCH-level: in-sample +0.66%/day over plain RSI<30, but out-of-sample holdout z_paired 1.53
+    # (below the 2.0 bar). Ranks candidates, never overrides net-EV / P(win).
+    _sma50 = latest.get('sma_50')
+    _sma200 = latest.get('sma_200')
+    golden_cross = bool(
+        pd.notna(_sma50) and pd.notna(_sma200)
+        and current_price > _sma200 and _sma50 > _sma200
+    )
+
+    # Sector relative strength was already cached and already shown in the long snapshot; the
+    # short one was the only place a candidate could be presented with no peer context at all.
+    try:
+        sector_data = load_sector_rs_cache().get(ticker, {})
+    except Exception:
+        sector_data = {}
 
     return {
         'ticker': ticker, 'current_price': round(current_price, 2),
+        'industry': sector_data.get('industry', 'Unknown'),
+        'sector_avg_momentum_60d': sector_data.get('sector_avg_momentum_60d'),
+        'sector_relative_strength': sector_data.get('sector_relative_strength'),
+        'outperforming_sector': sector_data.get('outperforming_sector'),
         'atr': round(atr, 2), 'atr_pct': round(latest['atr_pct'], 2),
         'stop_loss': round(stop_loss, 2), 'target': round(target_1, 2),
         'target_2': round(target_2, 2),
@@ -188,6 +211,7 @@ def get_swing_levels_short(ticker, stock_df=None):
         'rsi': round(latest['rsi'], 1), 'volume_spike': bool(volume_spike),
         'change_1yr_pct': round(change_1yr, 1) if change_1yr is not None and not pd.isna(change_1yr) else None,
         'trend_tier': trend_tier,
+        'golden_cross': golden_cross,
         'cap_bucket': CAP_BUCKET_MAP.get(ticker, 'Unknown'),
         # Day-clustered testing (2026-08) left these two strata no longer distinguishable from
         # random entry. Their net EV is still computed from the RSI-depth/meta edge, which does
@@ -223,6 +247,11 @@ def get_snapshot_text_short(ticker):
                  f"(highest return +1.23%/trade, fewer days so less certain), "
                  f"Downtrend z 0.71 (NOT distinguishable from random - tier no longer validated)\n")
         text += f"Resistance: ₹{levels['resistance_20d']}\n"
+        text += (f"Industry: {levels.get('industry', 'Unknown')} | Sector avg 60d momentum: "
+                 f"{fmt_pct(levels.get('sector_avg_momentum_60d'))} | This stock vs sector: "
+                 f"{fmt_pct(levels.get('sector_relative_strength'))} "
+                 f"({'outperforming peers' if levels.get('outperforming_sector') else 'in line with or behind peers'})"
+                 f" - context only, the RSI<30 edge was measured without it\n")
         text += f"Recent news: {'; '.join(news)}\n"
         return text
     except Exception as e:
@@ -305,7 +334,7 @@ def get_snapshot_text_long(ticker):
         text += f"{ticker} Snapshot ({LONG_HORIZON_DAYS}-day horizon):\n"
         text += (f"Market Cap Segment: {levels.get('cap_bucket', 'Unknown')} - near-52w-high z-scores were ~2.9x "
                  f"overlap-inflated; validated (day-clustered): Small z 4.28 HOLDS, Mid (z -0.01) and Large (z 0.34) "
-                 f"are DEAD/retired. The validated long-term signal is the cross-sectional MOMENTUM basket (z ~9.5).\n")
+                 f"are DEAD/retired. The validated long-term signal is the cross-sectional MOMENTUM basket (monthly z_paired 3.3, 2014-2026).\n")
         text += f"Current Price: ₹{levels['current_price']}\n"
         text += f"RSI: {levels['rsi']}\n"
         text += f"CAUTION - Extreme/parabolic move: {'YES - verify with fundamentals' if levels['extreme_momentum'] else 'No'}\n"
@@ -316,8 +345,9 @@ def get_snapshot_text_long(ticker):
                  f"re-run through the corrected engine; treat it as provisional\n")
         text += ev_block(levels)
         text += f"Model signal (weak, IGNORE): {levels['model_signal_pct']}% - old XGBoost, R-squared near zero\n"
-        text += f"Stop Loss (-{LONG_STOP_PCT*100:.0f}%): ₹{levels['stop_loss']}\n"
-        text += f"Target (+{LONG_TARGET_PCT*100:.0f}%): ₹{levels['target']}\n"
+        text += (f"Reference levels only, NOT a validated exit: -{LONG_STOP_PCT*100:.0f}% ₹{levels['stop_loss']} / "
+                 f"+{LONG_TARGET_PCT*100:.0f}% ₹{levels['target']}. On the momentum basket this fixed stop cost "
+                 f"-1.5%/trade vs a plain ~20-session hold (backtest_longterm_exits.py)\n")
         text += f"60-day Support: ₹{levels['support_60d']}\n"
         text += f"60-day Resistance: ₹{levels['resistance_60d']}\n"
         text += f"Recent news: {'; '.join(news)}\n"
@@ -558,21 +588,73 @@ def scan_watchlist_text_long(limit=30, validated_only=True):
     return text
 
 
-def scan_watchlist_text_long_momentum(limit=30):
+MIN_SECTOR_PEERS = 5     # below this the "sector" average is one or two stocks, i.e. noise
+
+
+def peer_strength(price_cache):
+    """{ticker: (industry, peer 60d mean %, stock-minus-peers %)} from the granular industry map.
+
+    Peer groups use the WHOLE cache, not just the scanned names - a bigger group is a better
+    estimate of what the theme is doing. Industries with fewer than MIN_SECTOR_PEERS names are
+    dropped rather than averaged into noise. Returns {} when the map has not been built.
+
+    DISPLAY ONLY. Sector strength is not a validated ranking input (backtest_sector_rank.py) and
+    must not reorder or filter the scan.
+    """
+    imap = load_industry_map()
+    if not imap:
+        return {}
+    own, industries = {}, {}
+    for ticker, df in price_cache.items():
+        ind = imap.get(ticker, {}).get('industry')
+        if not ind:
+            continue
+        c = df['close'].dropna().values
+        if len(c) < 61 or c[-61] <= 0:
+            continue
+        own[ticker] = (c[-1] / c[-61] - 1) * 100
+        industries.setdefault(ind, []).append(ticker)
+    out = {}
+    for ind, members in industries.items():
+        if len(members) < MIN_SECTOR_PEERS:
+            continue
+        avg = sum(own[t] for t in members) / len(members)
+        for t in members:
+            out[t] = (ind, round(avg, 1), round(own[t] - avg, 1))
+    return out
+
+
+def scan_watchlist_text_long_momentum(limit=20):
     """Cross-sectional momentum scan - the VALIDATED long-term signal (2026-08).
     Ranks the liquid Mid/Small universe by 12M-1M momentum (skip the most recent month) and surfaces
-    the TOP QUARTILE - the highest-z config in validation (day-clustered z ~9.5 out-of-sample, net
-    ~+1.5%/trade over ~20 trading days). Far stronger than the old near-52w-high screen (only
-    Small-cap survived that, z 4.28; Mid/Large were dead). Lower-volatility names within the basket
-    historically added return (the 'quality momentum' tilt) - atr% is shown so you can prefer them.
-    A hard top-decile+low-vol filter maxed net/trade but left too few names for a basket, so the
-    default is the broader, higher-z top quartile.
+    the TOP QUARTILE. Re-measured 2026-09 on NON-overlapping monthly rebalances (backtest_longterm_exits.py):
+    edge ~+0.6%/month over the universe, z_paired median 1.94 across 20 start offsets (9/20 clear 2.0) -
+    positive but not firmly demonstrated. The old 'z ~9.5' entered every day with a 20-day hold and
+    counted each month ~20 times.
+
+    NO stop / target: the inherited -8% stop / +16% target cost the basket -1.70%/trade (z_paired
+    -3.39, worse in 5/5 periods) - the stop whipsaws out of names that recover. The stop DOES cut
+    P(down >20%) from 3.1% to 0.2%; that trade-off is shown, not prescribed.
+
+    Re-checked monthly (backtest_longterm_recheck.py): the 'low-vol tilt adds return' claim was
+    BACKWARDS - low-atr% names returned -0.81%/month LESS than high-atr% (0/5 periods), but carry
+    half the tail (P(<-20%) 2.1% vs 4.2%). A risk dial, not a return edge. Top 20 beat the rest
+    of the quartile +0.69%/month in 4/5 periods (z_paired 1.40; the old +5.33 was overlap-inflated)
+    - directionally right, not demonstrated - so depth stays 20.
+
+    DO NOT add an over-extension FILTER - but DO show the tail risk. Measured 2026-09
+    (longterm_extension_results.md): mean return RISES with momentum (30-60% band +1.01%/trade ->
+    400%+ band +3.21%), so cutting extended names would remove the best ones. But the left tail
+    rises monotonically too - P(down >20% in 20 days) 2% -> 6% across the bands. In a basket the
+    return pays for that tail; in a single position it does not. Hence the per-name risk label
+    below instead of a filter.
 
     THIS IS A BASKET STRATEGY: hold SEVERAL of the top names, rebalanced ~monthly - not a single
     pick. Momentum CRASHES: 2 of the 5 backtested years were negative (the top names underperformed
     the universe). High return, high drawdown - size small and diversify across the basket.
     """
     cache = load_price_cache_long()
+    peers = peer_strength(cache)
     rows = []
     for ticker, df in cache.items():
         cap = CAP_BUCKET_MAP.get(ticker)
@@ -587,7 +669,9 @@ def scan_watchlist_text_long_momentum(limit=30):
             continue
         mom = c[-21] / c[-252] - 1                     # 12M-1M: return from 252 bars ago to 21 bars ago
         atrp = d['atr_pct'].values[-1]                 # normalised volatility, not absolute price std
+        ind, sec_mom, rs = peers.get(ticker, (None, None, None))
         rows.append({'ticker': ticker, 'cap': cap, 'price': round(float(c[-1]), 2),
+                     'industry': ind, 'sec_mom': sec_mom, 'rs': rs,
                      'mom_pct': round(mom * 100, 1),
                      'atr_pct': round(float(atrp), 1) if np.isfinite(atrp) else None,
                      'turn_cr': round(turn / 1e7, 1)})
@@ -600,19 +684,34 @@ def scan_watchlist_text_long_momentum(limit=30):
     top = d[d['mom_rank'] >= 0.75].sort_values('mom_pct', ascending=False)   # top quartile = the validated basket
 
     text = cache_status_note()
-    text += (f"Long-term MOMENTUM scan (validated 2026-08, day-clustered z ~9.5 out-of-sample, net "
-             f"~+1.5%/trade over ~20 trading days). Top quartile of the liquid Mid/Small universe by "
+    text += (f"Long-term MOMENTUM scan (2014-2026, 139 non-overlapping monthly rebalances: edge ~+0.75%/month over the universe, z_paired 3.3, positive in every era incl. 2014-2021 out-of-sample; flattered by survivorship - today's listed names only). Top quartile of the liquid Mid/Small universe by "
              f"12-month momentum ({len(top)} names today).\n"
-             f"⚠️ BASKET strategy - hold SEVERAL and rebalance ~monthly, NOT a single pick. Prefer "
-             f"lower atr% names (the low-vol / 'quality momentum' tilt added return in tests). Momentum "
-             f"CRASHES: 2 of 5 backtested years were negative. High return, high drawdown - size small.\n\n")
+             f"⚠️ BASKET strategy - hold SEVERAL and rebalance ~monthly, NOT a single pick. atr% is a "
+             f"RISK dial, not a return edge: low-atr% names had ~half the chance of a -20% month (about 2% vs "
+             f"4%) with no reliable return difference (less in 2021-26, equal in 2014-21). Momentum "
+             f"CRASHES: 2 of 5 backtested years were negative. High return, high drawdown - size small.\n"
+             f"EXIT (measured 2026-09): hold ~20 sessions, then re-rank. NO fixed stop/target - a -8% stop cost "
+             f"-1.5%/trade in 2021-26 (z -3.65) and -0.9% in 2014-21 out-of-sample (z -2.46) because momentum names "
+             f"dip and recover. It only paid in falling small-cap markets (2018-20). It "
+             f"does cut P(down >20%) from 3.1% to 0.2% per name - with only 1-2 names that trade-off is your call.\n"
+             f"Sorted highest-momentum first: the top 20 returned +2.19%/trade vs +1.39% for the whole quartile "
+             f"(monthly, non-overlapping; ahead of the rest in 4/5 periods but z_paired only 1.4 - not demonstrated).\n"
+             f"TAIL RISK rises with momentum even though mean return does too - P(down >20% in 20 days) runs "
+             f"2% / 3% / 3% / 5% / 6% across the 30-60 / 60-100 / 100-200 / 200-400 / 400%+ momentum bands. "
+             f"Shown per name below. A basket absorbs that tail; a single position does NOT - the further down "
+             f"this list you buy, the lower the expected return but also the smaller the blow-up risk.\n\n")
     for _, r in top.head(limit).iterrows():
-        stop = round(r['price'] * (1 - LONG_STOP_PCT), 2)
-        target = round(r['price'] * (1 + LONG_TARGET_PCT), 2)
         atr_s = f"{r['atr_pct']}% atr" if r['atr_pct'] is not None else "atr n/a"
+        if r['industry']:
+            sec_s = (f"\n    {r['industry']}: peers {r['sec_mom']:+.1f}% over 60d, this stock "
+                     f"{'ahead of' if r['rs'] > 0 else 'behind'} them by {abs(r['rs']):.1f}pp")
+        else:
+            sec_s = ""
+        tail = momentum_tail_risk(r['mom_pct'] / 100)
+        tail_s = (f" | tail risk {tail[0]:.0%} chance of -20% in 20d, worst-decile {tail[1]:.1f}%"
+                  + (" (thin sample, n=803)" if r['mom_pct'] >= 400 else "")) if tail else ""
         text += (f"{r['ticker']} [{r['cap']}]: Rs{r['price']}, 12M mom {r['mom_pct']:+.1f}%, {atr_s}, "
-                 f"{r['turn_cr']}cr/day | stop Rs{stop} (-{LONG_STOP_PCT*100:.0f}%), "
-                 f"target Rs{target} (+{LONG_TARGET_PCT*100:.0f}%)\n")
+                 f"{r['turn_cr']}cr/day{tail_s}{sec_s}\n")
     return text
 
 
@@ -748,6 +847,123 @@ def label_rel_strength(pct):
         return "strongly underperforming"
 
 
+def label_interest_cover(value):
+    if value >= 6:
+        return "comfortable"
+    elif value >= 3:
+        return "adequate"
+    elif value >= 1.5:
+        return "tight"
+    else:
+        return "cannot comfortably service its debt"
+
+
+def _parse_shp_date(raw):
+    """'30-JUN-2026' -> Timestamp. NSE mixes case ('30-Jun-2026'), hence the upper()."""
+    return pd.to_datetime(raw.strip().upper(), format='%d-%b-%Y')
+
+
+def promoter_snapshot(ticker):
+    """Latest promoter holding %, its change over the last 4 quarters, and current pledge %.
+
+    Sourced from NSE quarterly filings (build_shareholding_archive.py), NOT yfinance - yfinance's
+    'insider holding' is a different thing and wrong for Indian promoters. Returns {} when the
+    archive has not been built, so every caller degrades to silence rather than an error."""
+    symbol = ticker.replace(".NS", "")
+    out = {}
+    try:
+        rows = load_shareholding_archive().get(symbol) or []
+    except Exception:
+        rows = []
+    parsed = []
+    for r in rows:
+        try:
+            parsed.append((_parse_shp_date(r['date']), float(r['pr_and_prgrp'])))
+        except Exception:
+            continue
+    if parsed:
+        parsed.sort()
+        out['promoter_pct'] = parsed[-1][1]
+        out['promoter_as_of'] = parsed[-1][0].strftime('%d-%b-%Y')
+        out['promoter_quarters'] = len(parsed)
+        if len(parsed) >= 5:
+            out['promoter_change_1y_pp'] = round(parsed[-1][1] - parsed[-5][1], 2)
+        elif len(parsed) >= 2:
+            out['promoter_change_1y_pp'] = round(parsed[-1][1] - parsed[0][1], 2)
+    try:
+        pledge = load_pledge_snapshot().get(symbol) or {}
+        out['pledge_pct'] = float(str(pledge.get('percSharesPledged', '')).strip())
+        out['pledge_as_of'] = pledge.get('shp')
+    except Exception:
+        pass
+    return out
+
+
+# Thresholds are deliberately blunt and in code, not left to the model to eyeball: the verdict
+# has to be a tool result the agent can cite, and it has to read the same way every time.
+FRAGILE_RULES = (
+    ('cash_conversion', lambda v: v < 0, "operating cash flow is negative while profit is not - profit is on paper"),
+    ('interest_cover', lambda v: v < 1.5, "earnings barely cover the interest bill"),
+    ('debt_to_equity', lambda v: v > 200, "debt is more than 2x own money"),
+)
+SOLID_RULES = (
+    ('cash_conversion', lambda v: v >= 0.8, "profit is converting to real cash"),
+    ('interest_cover', lambda v: v >= 6, "interest bill is comfortably covered"),
+    ('debt_to_equity', lambda v: v < 100, "more own money than loans"),
+)
+
+
+def _trend_rising(pairs):
+    """True/False if the multi-year series is monotonically up (oldest->newest), None if unknown.
+    yfinance serves these newest-first, so sort by year before judging direction."""
+    if not pairs or len(pairs) < 3:
+        return None
+    vals = [v for _, v in sorted(pairs)]
+    return all(b > a for a, b in zip(vals, vals[1:]))
+
+
+def fundamental_verdict(fund, promoter=None):
+    """(verdict, [reasons]) - 'Solid' / 'Mixed' / 'Fragile' / 'Unknown'.
+
+    A SAFETY check that runs AFTER a name is flagged, never an input to the scan:
+    backtest_fundamentals.py measured these factors at z<2 against a random-entry control, and
+    backtest_promoter_holding.py did the same for the promoter/pledge triggers with far more
+    statistical power (555 broadcast days, every z_paired < 2 at holds of 5/10/21 sessions).
+    Any single fragile condition outweighs every solid one - the point is to catch landmines,
+    not to score businesses."""
+    promoter = promoter or {}
+    fragile, solid = [], []
+    for key, is_bad, why in FRAGILE_RULES:
+        v = fund.get(key)
+        if v is not None and is_bad(v):
+            fragile.append(why)
+    for key, is_good, why in SOLID_RULES:
+        v = fund.get(key)
+        if v is not None and is_good(v):
+            solid.append(why)
+
+    pledge = promoter.get('pledge_pct')
+    if pledge is not None and pledge >= 25:
+        fragile.append(f"{pledge:.1f}% of promoter shares are pledged")
+    drop = promoter.get('promoter_change_1y_pp')
+    if drop is not None and drop <= -5:
+        fragile.append(f"promoters cut their own holding by {abs(drop):.1f} percentage points over the past year")
+
+    pat_rising = _trend_rising(fund.get('pat_trend'))
+    if pat_rising is True:
+        solid.append("profit has risen every year on record")
+    elif pat_rising is False and _trend_rising(fund.get('rev_trend')) is False:
+        fragile.append("both sales and profit have failed to grow consistently")
+
+    if fragile:
+        return "Fragile", fragile
+    if not solid:
+        return "Unknown", ["not enough statement data to judge"]
+    if len(solid) >= 3:
+        return "Solid", solid
+    return "Mixed", solid
+
+
 def get_fundamentals_text(ticker):
     fund = get_fundamentals(ticker)
     if 'error' in fund:
@@ -768,6 +984,9 @@ def get_fundamentals_text(ticker):
     if fund['debt_to_equity'] is not None:
         de = fund['debt_to_equity'] / 100  # yfinance gives a percent; show the ratio (82 -> 0.82x)
         text += f"Debt vs own money: {de:.2f}x ({label_debt_to_equity(fund['debt_to_equity'])} leverage) - under 1 = more own money than loans\n"
+    if fund.get('interest_cover') is not None:
+        text += (f"Interest cover: {fund['interest_cover']:.1f}x ({label_interest_cover(fund['interest_cover'])}) "
+                 f"- how many times over the year's profit pays the year's interest bill\n")
     if fund.get('cash_conversion') is not None:
         text += f"Cash conversion: {fund['cash_conversion']:.2f}x ({label_cash_conversion(fund['cash_conversion'])}) - is the profit real cash or just on paper?\n"
     rev_t = format_trend(fund.get('rev_trend'))
@@ -776,8 +995,32 @@ def get_fundamentals_text(ticker):
         text += f"Sales over the years: {rev_t} - is the business getting bigger?\n"
     if pat_t:
         text += f"Profit over the years: {pat_t} - is it actually earning more?\n"
+    promoter = promoter_snapshot(ticker)
+    if promoter.get('promoter_pct') is not None:
+        text += f"Promoter holding: {promoter['promoter_pct']:.2f}% (NSE filing for quarter ending {promoter['promoter_as_of']})\n"
+        chg = promoter.get('promoter_change_1y_pp')
+        if chg is not None:
+            direction = "up" if chg > 0 else ("down" if chg < 0 else "unchanged")
+            text += (f"  Change over the past year: {direction} {abs(chg):.2f} percentage points "
+                     f"- context on who owns the business. Tested (promoter_holding_results.md): this does NOT predict forward returns, so it never changes the trade call\n")
+    if promoter.get('pledge_pct') is not None:
+        text += (f"Promoter shares pledged: {promoter['pledge_pct']:.2f}% (as of {promoter.get('pledge_as_of')}) "
+                 f"- shares the promoters have put up as loan collateral; a high number means a falling price "
+                 f"can force more selling\n")
+
     if fund['trailing_pe'] and fund['trailing_pe'] > 100:
         text += "NOTE: Very high P/E - the price already assumes big growth; risky if growth slips.\n"
+    verdict, reasons = fundamental_verdict(fund, promoter)
+    text += f"\nBUSINESS QUALITY VERDICT: {verdict}\n"
+    for r in reasons:
+        text += f"  - {r}\n"
+    text += {
+        'Solid': "  What to do: the business is sturdy, so a flagged setup can be sized normally.\n",
+        'Mixed': "  What to do: nothing alarming, nothing reassuring - size normally, no extra confidence.\n",
+        'Fragile': "  What to do: this is a landmine risk. Trade smaller or skip, even if the chart looks great.\n",
+        'Unknown': "  What to do: treat as unverified - absence of red flags is not the same as safety.\n",
+    }[verdict]
+
     if any(fund.get(k) is not None for k in ('roce_pct', 'cash_conversion', 'rev_trend')):
         text += (
             "\nHOW TO USE THIS (plain): the numbers above describe the BUSINESS, not the trade. We "
@@ -1117,7 +1360,11 @@ def scan_watchlist_text_short(limit=30, rsi_threshold=30):
     # RSI ignored the cost difference between names, the fact that edge scales with oversold
     # depth, and everything the meta-model knows about setup quality.
     df['meta_sort'] = df['meta_win_prob'].fillna(-1)
-    df = df.sort_values(['net_ev_pct', 'meta_sort', 'tier_sort'], ascending=[False, False, True])
+    # Golden-cross uptrend (strategy 035) is a WATCH-level refinement, so it only breaks ties
+    # AFTER net EV and P(win) - it prefers structurally-aligned names, never overrides EV.
+    df['gc_sort'] = df.get('golden_cross', False).astype(int)
+    df = df.sort_values(['net_ev_pct', 'meta_sort', 'gc_sort', 'tier_sort'],
+                        ascending=[False, False, False, True])
 
     text = cache_status_note()
     if not has_turnover:
@@ -1130,9 +1377,14 @@ def scan_watchlist_text_short(limit=30, rsi_threshold=30):
              f"Flat/Mild z 4.41 (most reliable) | Uptrend z 2.05 (highest return/trade, fewer days) | "
              f"Downtrend z 0.71 - NOT distinguishable from random, that tier is no longer validated.\n"
              f"Cap tier: Small-cap holds (z 2.74); Mid-cap is no longer demonstrated (z 1.73) - partly a "
-             f"power limit, not proof it loses.\n\n")
+             f"power limit, not proof it loses.\n"
+             f"[GC] = golden-cross uptrend (close>200SMA and 50SMA>200SMA), strategy-035 refinement: "
+             f"in-sample +0.66%/day over plain RSI<30, but out-of-sample holdout z_paired 1.53 (below the "
+             f"2.0 bar) - WATCH-level, pending live forward validation. It ranks candidates up as a "
+             f"tiebreaker only; it does NOT gate entries or change the NET EV.\n\n")
     for _, row in df.head(limit).iterrows():
         spike_flag = " [VOLUME SPIKE]" if row['volume_spike'] else ""
+        gc_flag = " [GC]" if row.get('golden_cross') else ""
         turn = f"{row['turnover_60d_cr']}cr/day" if row['turnover_60d_cr'] is not None else "turnover n/a"
         mp = row['meta_win_prob']
         if mp is not None and pd.notna(mp):
@@ -1147,7 +1399,7 @@ def scan_watchlist_text_short(limit=30, rsi_threshold=30):
             unvalidated.append("Mid-cap")
         unval_flag = (f"\n    ⚠️ {' + '.join(unvalidated)}: not distinguishable from random entry once "
                       f"day-clustered - the NET EV above does not account for this.") if unvalidated else ""
-        text += (f"{row['ticker']} [{row['cap_bucket']}, {row['trend_tier']}, {row['change_1yr_pct']}% 1yr]: "
+        text += (f"{row['ticker']} [{row['cap_bucket']}, {row['trend_tier']}, {row['change_1yr_pct']}% 1yr]{gc_flag}: "
                  f"Price ₹{row['current_price']}, "
                  f"RSI {row['rsi']}, Stop ₹{row['stop_loss']}, Target ₹{row['target']}{spike_flag}{unval_flag}\n"
                  f"    liquidity {turn} | round-trip cost {row['round_trip_cost_pct']}% | "
@@ -1209,6 +1461,30 @@ def calculate_position_size(ticker, total_capital, risk_pct=DEFAULT_RISK_PCT, te
                        f"calculated. Show the user this number and ask whether they still want to proceed. "
                        f"If they confirm, call again with confirmed=true.")
         }
+
+    # Business-quality gate. This is RISK MANAGEMENT, not signal: promoter/pledge triggers were
+    # measured at z_paired < 2 (promoter_holding_results.md) and the statement factors at z < 2
+    # (backtest_fundamentals.py), so a Fragile verdict predicts nothing about the next few days.
+    # It gates anyway, because the losses it guards against - a forced pledge unwind, a company
+    # that cannot service its debt - are the kind a backtest of average returns does not price.
+    # It BLOCKS pending confirmation rather than refusing: the call stays the user's.
+    if not confirmed:
+        try:
+            _fund = get_fundamentals(ticker)
+            _verdict, _why = ((None, None) if 'error' in _fund
+                              else fundamental_verdict(_fund, promoter_snapshot(ticker)))
+        except Exception:
+            _verdict, _why = None, None      # never let a data hiccup block a valid trade
+        if _verdict == 'Fragile':
+            return {
+                'blocked': True,
+                'reason': (f"{ticker} fails the business-quality check: " + "; ".join(_why) + ". "
+                           f"Position sizing was NOT calculated. This does NOT predict the price move - "
+                           f"it flags the company as fragile enough that a bad week can become a very bad "
+                           f"week. Show the user these reasons and ask whether they want to proceed, size "
+                           f"smaller, or skip. If they confirm, call again with confirmed=true."),
+                'business_quality': _verdict,
+            }
 
     if risk_pct > MAX_RISK_PCT and not confirmed:
         return {
@@ -1524,6 +1800,13 @@ def exit_verdict(current, stop, target, days_held, horizon):
     in the watcher is how the alert and the on-demand check would eventually disagree about
     whether a position is out.
     """
+    if horizon >= LONG_HORIZON_DAYS:   # long-term: fixed stop/target measured harmful (backtest_longterm_exits.py)
+        if current <= stop:
+            return 'stop', ("STOP HIT - your own stop-loss, not a validated rule: on the momentum basket a fixed "
+                            "-8% stop cost -1.5%/trade vs holding ~20 sessions. Your call.")
+        if current >= target:
+            return 'target', ("TARGET HIT - your own target, not a validated rule: capping momentum winners "
+                              "measured slightly negative (-0.24%/trade, not significant). Your call.")
     if current <= stop:
         return 'stop', "EXIT NOW - price has hit/breached your stop-loss (validated rule)."
     if current >= target:
@@ -1823,7 +2106,7 @@ TOOL_DEFINITIONS = [
     }},
     {"type": "function", "function": {
         "name": "scan_watchlist_text_long",
-        "description": "Long-term (~1 month) MOMENTUM scan: ranks the liquid Mid/Small universe by 12-month momentum and surfaces the VALIDATED top quartile as a diversified BASKET (day-clustered z ~9.5 out-of-sample, net ~+1.5%/trade). Buy strength. WARNING: momentum crashes hard periodically - present it as a basket held ~monthly and sized small, NOT a single pick.",
+        "description": "Long-term (~1 month) MOMENTUM scan: ranks the liquid Mid/Small universe by 12-month momentum and surfaces the VALIDATED top quartile as a diversified BASKET (2014-2026 monthly: ~+0.75%/month over the universe, z_paired 3.3, survivorship-flattered; hold ~20 sessions, no fixed stop/target - they measured harmful). Buy strength. WARNING: momentum crashes hard periodically - present it as a basket held ~monthly and sized small, NOT a single pick.",
         "parameters": {
             "type": "object",
             "properties": {

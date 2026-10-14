@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "streamlit-home",
+      "runtimeExecutable": "streamlit",
+      "runtimeArgs": ["run", "Home.py"],
+      "port": 8501
+    }
+  ]
+}

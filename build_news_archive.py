@@ -27,7 +27,34 @@ from datetime import datetime, timedelta
 
 import requests
 
-from news_watcher import BROWSER_HEADERS, NSE_ANNOUNCEMENTS, NSE_HOME, load_watchlist
+# These used to be imported from news_watcher.py, which has moved out to its own repo
+# (news-watcher-automation-tool). Four constants and a CSV read are not worth a dependency on
+# another project, so they live here now - this script is the only thing left that needs them.
+NSE_HOME = "https://www.nseindia.com"
+NSE_ANNOUNCEMENTS = f"{NSE_HOME}/api/corporate-announcements"
+BROWSER_HEADERS = {
+    'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                   '(KHTML, like Gecko) Chrome/120 Safari/537.36'),
+    'Accept': '*/*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Referer': f"{NSE_HOME}/companies-listing/corporate-filings-announcements",
+}
+WATCHLIST_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "nse_watchlist_expanded.csv")
+
+
+def load_watchlist():
+    """(symbols, cap_by_symbol) from the CSV. NSE rejects requests without a browser-like
+    session, which is why the headers above exist."""
+    import csv
+    symbols, caps = set(), {}
+    with open(WATCHLIST_CSV, newline='', encoding='utf-8') as f:
+        for row in csv.DictReader(f):
+            sym = (row.get('Symbol') or '').strip()
+            if sym:
+                symbols.add(sym)
+                caps[sym] = (row.get('cap_bucket') or 'Unknown').strip()
+    return symbols, caps
 
 CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
 ARCHIVE_FILE = os.path.join(CACHE_DIR, "news_archive.pkl")

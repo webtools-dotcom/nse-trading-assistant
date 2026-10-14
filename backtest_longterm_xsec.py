@@ -36,13 +36,25 @@ def build_rows():
         vol = pd.Series(c).rolling(10).std().values
         mom = np.full(n, np.nan)
         fwd = np.full(n, np.nan)
+        ret_1m = np.full(n, np.nan)      # the month the 12M-1M rank deliberately skips
+        fwd60 = np.full(n, np.nan)       # same entry, 3x the hold - does the rally give it back?
+        ret_3m = np.full(n, np.nan)
         for i in range(252, n - H - 1):
             if c[i - 252] > 0:
                 mom[i] = c[i - 21] / c[i - 252] - 1
+            if c[i - 21] > 0:
+                ret_1m[i] = c[i] / c[i - 21] - 1
+            if c[i - 60] > 0:
+                ret_3m[i] = c[i] / c[i - 60] - 1     # trailing 60d - the sector-strength input
             if o[i + 1] > 0:  # enter next open, exit close[i+1+H] - no signal-day-close look-ahead
                 fwd[i] = (c[i + 1 + H] - o[i + 1]) / o[i + 1] * 100 - round_trip_cost_pct(turn[i])
+                if i + 61 < n:
+                    fwd60[i] = (c[i + 61] - o[i + 1]) / o[i + 1] * 100 - round_trip_cost_pct(turn[i])
         rows.append(pd.DataFrame({'date': df['date'].values, 'ticker': t, 'mom': mom,
-                                  'vol': vol, 'fwd': fwd, 'turn': turn}))
+                                  'vol': vol, 'fwd': fwd, 'turn': turn, 'ret_1m': ret_1m, 'fwd60': fwd60, 'ret_3m': ret_3m,
+                                  'above200': c / df['sma_200'].values - 1,
+                                  'dh': df['dist_from_high_252'].values,
+                                  'rsi': df['rsi'].values}))
     a = pd.concat(rows).dropna(subset=['mom', 'fwd'])
     return a[a['turn'] >= MIN_TURNOVER_INR].copy()
 
